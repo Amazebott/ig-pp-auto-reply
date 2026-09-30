@@ -4,8 +4,8 @@ import requests
 
 app = Flask(__name__)
 
-ACCESS_TOKEN = "YOUR_PAGE_ACCESS_TOKEN_HERE"
-VERIFY_TOKEN = "mysecret123"
+ACCESS_TOKEN ="need to fin"              # YOUR_PAGE_ACCESS_TOKEN_HERE
+VERIFY_TOKEN = "mysecret123"               # WHAT ELSE TO INCLUDE IN MESSAGE
 REPLY_MESSAGE = "Thanks! Check your DM 😊"
 
 GRAPH_URL = "https://graph.facebook.com/v20.0"
