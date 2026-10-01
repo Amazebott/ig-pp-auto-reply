@@ -15,6 +15,21 @@ def debug_sub():
 )
     return r.text
 
+@app.route('/debug-status')
+def debug_status():
+    import requests, os
+    TOKEN = os.environ.get('IG_ACCESS_TOKEN')
+    r = requests.get(
+        f"https://graph.instagram.com/v20.0/me/subscribed_apps",
+        params={"access_token": TOKEN}
+    )
+    # also who is /me ?
+    r2 = requests.get(
+        f"https://graph.instagram.com/v20.0/me?fields=id,username",
+        params={"access_token": TOKEN}
+    )
+    return f"SUBSCRIBED: {r.text}<br><br>ME IS: {r2.text}"
+
 VERIFY_TOKEN = os.getenv("VERIFY_TOKEN", "").strip()
 PAGE_ACCESS_TOKEN = os.getenv("PAGE_ACCESS_TOKEN", "").strip()
 
