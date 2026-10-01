@@ -3,6 +3,17 @@ from flask import Flask, request
 
 app = Flask(__name__)
 
+@app.route('/debug-subscription')
+def debug_sub():
+    import requests
+    IG_USER_ID = os.environ.get('IG_USER_ID')
+    TOKEN = os.environ.get('IG_ACCESS_TOKEN')
+    r = requests.post(
+        f"https://graph.instagram.com/v20.0/{IG_USER_ID}/subscribed_apps",
+        data={"access_token": TOKEN}
+    )
+    return r.text
+
 VERIFY_TOKEN = os.getenv("VERIFY_TOKEN", "").strip()
 PAGE_ACCESS_TOKEN = os.getenv("PAGE_ACCESS_TOKEN", "").strip()
 
