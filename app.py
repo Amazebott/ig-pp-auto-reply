@@ -1,12 +1,10 @@
-import os, json, requests, sys
+import os, json, requests
 from flask import Flask, request
 
 app = Flask(__name__)
 
 VERIFY_TOKEN = os.getenv("VERIFY_TOKEN", "").strip()
-IG_TOKEN = os.getenv("IG_ACCESS_TOKEN","").strip()  # IGAA... token for parentingpulse.pp
-# keep PAGE token only if you still need comment replies via Page
-PAGE_ACCESS_TOKEN = os.getenv("PAGE_ACCESS_TOKEN", "").strip() 
+IG_TOKEN = os.getenv("IG_ACCESS_TOKEN","").strip()  # IGAA token for parentingpulse.pp - ME IS
 
 WELCOME_MESSAGE = os.getenv("WELCOME_MESSAGE", "Hey! Thanks for DMing 💛")
 COMMENT_MESSAGE = os.getenv("COMMENT_MESSAGE", "Thanks so much! 💛")
@@ -21,9 +19,7 @@ def send_dm(recipient_id, text):
     if rid in ["0", "23245", "12334"]:
         print(f"Skipping fake test ID {rid}", flush=True)
         return None
-
     print(f"Sending DM to {rid}: {text}", flush=True)
-    # CORRECT endpoint for IG Login tokens
     url = f"https://graph.instagram.com/v20.0/me/messages"
     payload = {
         "access_token": IG_TOKEN,
@@ -35,7 +31,6 @@ def send_dm(recipient_id, text):
     return r
 
 def reply_to_comment(comment_id, text):
-    # comments still work via instagram graph with same IG token
     print(f"Replying to comment {comment_id}: {text}", flush=True)
     url = f"https://graph.instagram.com/v20.0/{comment_id}/replies"
     r = requests.post(url, data={"access_token": IG_TOKEN, "message": text})
@@ -71,25 +66,21 @@ def debug_status():
 @app.route('/webhook', methods=['POST'])
 def webhook():
     data = request.get_json()
-    print(f"Received webhook: {json.dumps(data)[:2000]}", flush=True)
+    print(f"Received webhook: {json.dumps(data)[:3000]}", flush=True)
     if not data:
         return "OK", 200
-
     for entry in data.get("entry", []):
-        entry_id = str(entry.get("id", ""))
-        if entry_id == "0":
-            print("Meta dashboard TEST event (id=0) - ignore", flush=True)
+        if str(entry.get("id","")) == "0":
+            print("Meta TEST id=0 ignore", flush=True)
             continue
-
         for msg in entry.get("messaging", []):
             if msg.get("message", {}).get("is_echo"):
                 continue
             sender_id = msg.get("sender", {}).get("id")
             text = msg.get("message", {}).get("text", "")
             print(f"DM from {sender_id}: {text}", flush=True)
-            if sender_id and text:
+            if sender_id:
                 send_dm(sender_id, WELCOME_MESSAGE)
-
         for change in entry.get("changes", []):
             field = change.get("field")
             val = change.get("value", {})
