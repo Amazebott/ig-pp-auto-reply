@@ -63,21 +63,46 @@ def webhook():
         # COMMENT HANDLER
         for change in entry.get("changes", []):
            # if change.get("field") in ["comments", "feed"]:
-            if change.get("field") in ["comments", "feed", "messages"]:
-                val = change.get("value", {})
-                media_id = str(val.get("media_id") or val.get("post_id") or "")
-                comment_text = val.get("text", "").lower()
-                comment_id = val.get("comment_id") or val.get("id")
-                from_id = val.get("from", {}).get("id")
-                print(f"Comment '{comment_text}' on {media_id}", flush=True)
+                
+            field = change.get("field")
+            if field not in ["comments", "feed", "messages"]:
+                continue
 
-                if "link" in comment_text and comment_id:
-                    link_to_send = POST_LINKS.get(media_id) or POST_LINKS.get("default")
-                    reply_to_comment(comment_id, COMMENT_DM_PROMPT)
-                    if from_id:
-                        send_dm(from_id, LINK_DM_TEMPLATE.replace("{LINK}", link_to_send))
-                elif comment_id and val.get("verb") == "add":
-                    reply_to_comment(comment_id, COMMENT_MESSAGE)
+            # --- DM HANDLER (Meta test + real DMs as field=messages) ---
+            if field == "messages":
+                val = change.get("value", {})
+                sender_obj = val.get("sender", {})
+                if isinstance(sender_obj, dict):
+                    # sender can be {'id': '123'} or {'123': ...}
+                    sender_id = sender_obj.get("id") or next(iter(sender_obj.keys()), None)
+                else:
+                    sender_id = sender_obj
+                
+                msg_obj = val.get("message", {})
+                msg_text = msg_obj.get("text", "") if isinstance(msg_obj, dict) else ""
+                
+                print(f"DM (via changes) from {sender_id}: {msg_text}", flush=True)
+                if sender_id:
+                    clean_id = str(sender_id).strip("{}'\" ")
+                    send_dm(clean_id, WELCOME_MESSAGE)
+                continue
+
+            # --- COMMENT HANDLER ---
+            val = change.get("value", {})
+            media_id = str(val.get("media_id") or val.get("post_id") or "")
+            comment_text = val.get("text", "").lower()
+            comment_id = val.get("comment_id") or val.get("id")
+            from_id = val.get("from", {}).get("id")
+            
+            print(f"Comment '{comment_text}' on {media_id}", flush=True)
+
+            if "link" in comment_text and comment_id:
+                link_to_send = POST_LINKS.get(media_id) or POST_LINKS.get("default")
+                reply_to_comment(comment_id, COMMENT_DM_PROMPT)
+                if from_id:
+                    send_dm(from_id, LINK_DM_TEMPLATE.replace("{LINK}", link_to_send))
+            elif comment_id and val.get("verb") == "add":
+                reply_to_comment(comment_id, COMMENT_MESSAGE)
 
     return "OK", 200
 
