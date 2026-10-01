@@ -3,8 +3,8 @@ from flask import Flask, request
 
 app = Flask(__name__)
 
-VERIFY_TOKEN = os.getenv("VERIFY_TOKEN")
-PAGE_ACCESS_TOKEN = os.getenv("PAGE_ACCESS_TOKEN")
+VERIFY_TOKEN = os.getenv("VERIFY_TOKEN", "").strip()
+PAGE_ACCESS_TOKEN = os.getenv("PAGE_ACCESS_TOKEN", "").strip()
 
 WELCOME_MESSAGE = os.getenv("WELCOME_MESSAGE", "Hey! Thanks for DMing 💛")
 COMMENT_MESSAGE = os.getenv("COMMENT_MESSAGE", "Thanks so much! 💛")
@@ -13,6 +13,14 @@ LINK_DM_TEMPLATE = os.getenv("LINK_DM_TEMPLATE", "Here you go! {LINK}")
 POST_LINKS = json.loads(os.getenv("POST_LINKS_JSON", '{"default": "https://your-link.com"}'))
 
 def send_dm(recipient_id, text):
+    if not recipient_id:
+        print("send_dm skipped - no recipient_id", flush=True)
+        return None
+    # skip fake Meta test ids
+    if str(recipient_id) in ["0", "23245", "12334"]:
+        print(f"Skipping send to fake test ID {recipient_id}", flush=True)
+        return None
+
     print(f"Sending DM to {recipient_id}: {text}", flush=True)
     url = f"https://graph.facebook.com/v20.0/me/messages?access_token={PAGE_ACCESS_TOKEN}"
     r = requests.post(url, json={"recipient": {"id": recipient_id}, "message": {"text": text}})
@@ -52,7 +60,13 @@ def webhook():
         return "OK", 200
 
     for entry in data.get("entry", []):
-        # DM HANDLER - THIS WAS MISSING
+        # --- FIX: Ignore Meta dashboard test button ---
+        entry_id = str(entry.get("id", ""))
+        if entry_id == "0":
+            print("✅ Meta dashboard TEST event (id=0) - returning 200 OK without sending", flush=True)
+            continue
+
+        # DM HANDLER - real DMs via messaging array
         for msg in entry.get("messaging", []):
             sender_id = msg.get("sender", {}).get("id")
             text = msg.get("message", {}).get("text", "")
@@ -60,10 +74,8 @@ def webhook():
             if sender_id and text:
                 send_dm(sender_id, WELCOME_MESSAGE)
 
-        # COMMENT HANDLER
+        # COMMENT + DM via changes HANDLER
         for change in entry.get("changes", []):
-           # if change.get("field") in ["comments", "feed"]:
-                
             field = change.get("field")
             if field not in ["comments", "feed", "messages"]:
                 continue
@@ -73,7 +85,6 @@ def webhook():
                 val = change.get("value", {})
                 sender_obj = val.get("sender", {})
                 if isinstance(sender_obj, dict):
-                    # sender can be {'id': '123'} or {'123': ...}
                     sender_id = sender_obj.get("id") or next(iter(sender_obj.keys()), None)
                 else:
                     sender_id = sender_obj
@@ -108,3 +119,4 @@ def webhook():
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=10000)
+
