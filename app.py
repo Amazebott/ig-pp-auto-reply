@@ -1,4 +1,4 @@
-import os, json, requests
+import os, json, requests, sys
 from flask import Flask, request
 
 app = Flask(__name__)
@@ -13,48 +13,54 @@ LINK_DM_TEMPLATE = os.getenv("LINK_DM_TEMPLATE", "Here you go! {LINK}")
 POST_LINKS = json.loads(os.getenv("POST_LINKS_JSON", '{"default": "https://your-link.com"}'))
 
 def send_dm(recipient_id, text):
-    print(f"Sending DM to {recipient_id}: {text}")
+    print(f"Sending DM to {recipient_id}: {text}", flush=True)
     url = f"https://graph.facebook.com/v20.0/me/messages?access_token={PAGE_ACCESS_TOKEN}"
     r = requests.post(url, json={"recipient": {"id": recipient_id}, "message": {"text": text}})
-    print(f"Send DM result: {r.status_code} {r.text}")
+    print(f"Send DM result: {r.status_code} {r.text}", flush=True)
     return r
 
 def reply_to_comment(comment_id, text):
+    print(f"Replying to comment {comment_id}: {text}", flush=True)
     url = f"https://graph.facebook.com/v20.0/{comment_id}/replies?access_token={PAGE_ACCESS_TOKEN}"
     r = requests.post(url, json={"message": text})
-    print(f"Reply comment result: {r.status_code} {r.text}")
+    print(f"Reply result: {r.status_code} {r.text}", flush=True)
+    return r
 
 @app.route('/')
 def home():
-    return "Bot is running"
+    return "Bot is running - webhook ready"
 
 @app.route('/webhook', methods=['GET'])
 def verify():
-    if request.args.get("hub.verify_token") == VERIFY_TOKEN:
-        return request.args.get("hub.challenge")
+    token = request.args.get("hub.verify_token")
+    challenge = request.args.get("hub.challenge")
+    if token == VERIFY_TOKEN:
+        return challenge
     return "Verification failed", 403
+
+@app.route('/posts')
+def list_posts():
+    url = f"https://graph.facebook.com/v20.0/me/media?fields=id,caption,permalink&access_token={PAGE_ACCESS_TOKEN}"
+    return requests.get(url).json()
 
 @app.route('/webhook', methods=['POST'])
 def webhook():
     data = request.get_json()
-    print(f"Received webhook: {data}")
+    print(f"Received webhook: {data}", flush=True)
 
     if not data:
         return "OK", 200
 
-    # 1. HANDLE INSTAGRAM DMs (messaging)
     for entry in data.get("entry", []):
-        # Instagram DMs come here
-        for msg_event in entry.get("messaging", []):
-            sender_id = msg_event.get("sender", {}).get("id")
-            message_text = msg_event.get("message", {}).get("text", "")
-            print(f"DM from {sender_id}: {message_text}")
-
-            # Don't reply to yourself
-            if sender_id:
+        # DM HANDLER - THIS WAS MISSING
+        for msg in entry.get("messaging", []):
+            sender_id = msg.get("sender", {}).get("id")
+            text = msg.get("message", {}).get("text", "")
+            print(f"DM from {sender_id}: {text}", flush=True)
+            if sender_id and text:
                 send_dm(sender_id, WELCOME_MESSAGE)
 
-        # 2. HANDLE COMMENTS (changes)
+        # COMMENT HANDLER
         for change in entry.get("changes", []):
             if change.get("field") in ["comments", "feed"]:
                 val = change.get("value", {})
@@ -62,8 +68,7 @@ def webhook():
                 comment_text = val.get("text", "").lower()
                 comment_id = val.get("comment_id") or val.get("id")
                 from_id = val.get("from", {}).get("id")
-
-                print(f"Comment: {comment_text} on {media_id}")
+                print(f"Comment '{comment_text}' on {media_id}", flush=True)
 
                 if "link" in comment_text and comment_id:
                     link_to_send = POST_LINKS.get(media_id) or POST_LINKS.get("default")
