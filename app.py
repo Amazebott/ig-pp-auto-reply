@@ -9,7 +9,8 @@ def debug_sub():
     IG_USER_ID = os.environ.get('IG_USER_ID')
     TOKEN = os.environ.get('IG_ACCESS_TOKEN')
     r = requests.post(
-    f"https://graph.instagram.com/v20.0/{IG_USER_ID}/subscribed_apps",
+   # f"https://graph.instagram.com/v20.0/{IG_USER_ID}/subscribed_apps",
+        f"https://graph.instagram.com/v20.0/me/subscribed_apps",
     data={"access_token": TOKEN, "subscribed_fields": "messages"}
 )
     return r.text
