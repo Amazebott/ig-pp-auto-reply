@@ -62,7 +62,8 @@ def webhook():
 
         # COMMENT HANDLER
         for change in entry.get("changes", []):
-            if change.get("field") in ["comments", "feed"]:
+           # if change.get("field") in ["comments", "feed"]:
+            if change.get("field") in ["comments", "feed", "messages"]:
                 val = change.get("value", {})
                 media_id = str(val.get("media_id") or val.get("post_id") or "")
                 comment_text = val.get("text", "").lower()
