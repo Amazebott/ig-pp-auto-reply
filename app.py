@@ -1,54 +1,56 @@
-
+import os, json, requests
 from flask import Flask, request
-import requests
-import os
 
 app = Flask(__name__)
 
-# Render will inject these secretly, not in GitHub
-VERIFY_TOKEN = os.environ.get("VERIFY_TOKEN", "parentingpulse123")
-ACCESS_TOKEN = os.environ.get("PAGE_ACCESS_TOKEN")
-REPLY_MESSAGE = os.environ.get("WELCOME_MESSAGE", "Hey! Welcome to Parenting Pulse 💛 Thanks for your message!")
+VERIFY_TOKEN = os.getenv("VERIFY_TOKEN")
+PAGE_ACCESS_TOKEN = os.getenv("PAGE_ACCESS_TOKEN")
 
-GRAPH_URL = "https://graph.facebook.com/v20.0"
+# ALL messages are variables now - you can change them in Render > Edit anytime
+WELCOME_MESSAGE = os.getenv("WELCOME_MESSAGE", "Hey! Thanks for DMing 💛")
+COMMENT_MESSAGE = os.getenv("COMMENT_MESSAGE", "Thanks so much! 💛")
+COMMENT_DM_PROMPT = os.getenv("COMMENT_DM_PROMPT", "Just sent you the link in DMs! 💛")
+LINK_DM_TEMPLATE = os.getenv("LINK_DM_TEMPLATE", "Here you go! {LINK}")
 
-@app.route('/')
-def home():
-    # Support verification on root too
-    if request.args.get("hub.mode") == "subscribe":
-        if request.args.get("hub.verify_token") == VERIFY_TOKEN:
-            return request.args.get("hub.challenge"), 200
-        return "Failed", 403
-    return "IG Bot is running! Use /webhook as Callback URL"
+POST_LINKS = json.loads(os.getenv("POST_LINKS_JSON", '{"default": "https://your-link.com"}'))
 
-@app.route('/webhook', methods=['GET'])
-def verify():
-    if request.args.get("hub.mode") == "subscribe" and request.args.get("hub.verify_token") == VERIFY_TOKEN:
-        print("WEBHOOK VERIFIED")
-        return request.args.get("hub.challenge"), 200
-    return "Failed", 403
+def send_dm(recipient_id, text):
+    url = f"https://graph.facebook.com/v20.0/me/messages?access_token={PAGE_ACCESS_TOKEN}"
+    requests.post(url, json={"recipient": {"id": recipient_id}, "message": {"text": text}})
+
+def reply_to_comment(comment_id, text):
+    url = f"https://graph.facebook.com/v20.0/{comment_id}/replies?access_token={PAGE_ACCESS_TOKEN}"
+    requests.post(url, json={"message": text})
+
+@app.route('/posts')
+def list_posts():
+    url = f"https://graph.facebook.com/v20.0/me/media?fields=id,caption,permalink&access_token={PAGE_ACCESS_TOKEN}"
+    return requests.get(url).json()
 
 @app.route('/webhook', methods=['POST'])
 def webhook():
     data = request.get_json()
-    if data.get("object") == "instagram":
-        for entry in data.get("entry", []):
-            for msg in entry.get("messaging", []):
-                sender_id = msg.get("sender", {}).get("id")
-                if msg.get("message") and not msg["message"].get("is_echo") and sender_id:
-                    print(f"DM from {sender_id}")
-                    try:
-                        requests.post(
-                            f"{GRAPH_URL}/me/messages",
-                            params={"access_token": ACCESS_TOKEN},
-                            json={
-                                "recipient": {"id": sender_id},
-                                "message": {"text": REPLY_MESSAGE}
-                            }
-                        )
-                    except Exception as e:
-                        print(e)
+    for entry in data.get("entry", []):
+        for change in entry.get("changes", []):
+            if change.get("field") in ["comments", "feed"]:
+                val = change.get("value", {})
+                media_id = str(val.get("media_id") or val.get("post_id") or "")
+                comment_text = val.get("text", "").lower()
+                comment_id = val.get("comment_id") or val.get("id")
+                from_id = val.get("from", {}).get("id")
+
+                if "link" in comment_text and comment_id:
+                    link_to_send = POST_LINKS.get(media_id) or POST_LINKS.get("default")
+                    # Uses your Render variable for public reply
+                    reply_to_comment(comment_id, COMMENT_DM_PROMPT)
+                    # Uses your Render variable for DM - replaces {LINK}
+                    if from_id:
+                        send_dm(from_id, LINK_DM_TEMPLATE.replace("{LINK}", link_to_send))
+                elif comment_id and val.get("verb") == "add":
+                    # Uses your Render variable for normal thanks
+                    reply_to_comment(comment_id, COMMENT_MESSAGE)
     return "OK", 200
 
-if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 10000)))
+# ... keep your verify route and home route
+
+# keep your verify, send_dm, reply_to_comment as before
