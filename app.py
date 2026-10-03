@@ -60,28 +60,28 @@ def verify():
     return "Verification failed", 403
 
 # --- DEBUG CODE KEPT BUT COMMENTED OUT ---
-# @app.route('/debug-subscription')
-# def debug_sub():
-#     IG_USER_ID = os.environ.get('IG_USER_ID')
-#     TOKEN = os.environ.get('IG_ACCESS_TOKEN')
-#     r = requests.post(
-#         f"https://graph.instagram.com/v25.0/me/subscribed_apps",
-#         data={"access_token": TOKEN, "subscribed_fields": "messages"}
-#     )
-#     return r.text
-#
-# @app.route('/debug-status')
-# def debug_status():
-#     TOKEN = os.environ.get('IG_ACCESS_TOKEN')
-#     r = requests.get(
-#         f"https://graph.instagram.com/v25.0/me/subscribed_apps",
-#         params={"access_token": TOKEN}
-#     )
-#     r2 = requests.get(
-#         f"https://graph.instagram.com/v25.0/me?fields=id,username",
-#         params={"access_token": TOKEN}
-#     )
-#     return f"SUBSCRIBED: {r.text}<br><br>ME IS: {r2.text}"
+ @app.route('/debug-subscription')
+ def debug_sub():
+     IG_USER_ID = os.environ.get('IG_USER_ID')
+     TOKEN = os.environ.get('IG_ACCESS_TOKEN')
+     r = requests.post(
+         f"https://graph.instagram.com/v25.0/me/subscribed_apps",
+         data={"access_token": TOKEN, "subscribed_fields": "messages"}
+     )
+     return r.text
+
+ @app.route('/debug-status')
+ def debug_status():
+     TOKEN = os.environ.get('IG_ACCESS_TOKEN')
+     r = requests.get(
+         f"https://graph.instagram.com/v25.0/me/subscribed_apps",
+         params={"access_token": TOKEN}
+     )
+     r2 = requests.get(
+         f"https://graph.instagram.com/v25.0/me?fields=id,username",
+         params={"access_token": TOKEN}
+     )
+     return f"SUBSCRIBED: {r.text}<br><br>ME IS: {r2.text}"
 #
 # # --- ADDITIONAL DEBUG HELPERS (kept commented) ---
 # @app.route('/debug-token')
