@@ -21,21 +21,29 @@ def send_dm(recipient_id, text):
         print(f"Skipping fake test ID {rid}", flush=True)
         return None
     print(f"Sending DM to {rid}: {text}", flush=True)
-    # FIXED: Use Instagram graph + IG_TOKEN for IG Login
-    url = f"https://graph.instagram.com/v20.0/me/messages"
-    payload = {
-        "access_token": IG_TOKEN,
-        "recipient": json.dumps({"id": rid}),
-        "message": json.dumps({"text": text})
+    # FIXED: v25.0 + Bearer + JSON for Instagram Login
+    url = f"https://graph.instagram.com/v25.0/me/messages"
+    headers = {
+        "Authorization": f"Bearer {IG_TOKEN}",
+        "Content-Type": "application/json"
     }
-    r = requests.post(url, data=payload)
+    payload = {
+        "recipient": {"id": rid},
+        "message": {"text": text}
+    }
+    r = requests.post(url, headers=headers, json=payload, timeout=10)
     print(f"Send DM result: {r.status_code} {r.text}", flush=True)
     return r
 
 def reply_to_comment(comment_id, text):
     print(f"Replying to comment {comment_id}: {text}", flush=True)
-    url = f"https://graph.instagram.com/v20.0/{comment_id}/replies"
-    r = requests.post(url, data={"access_token": IG_TOKEN, "message": text})
+    url = f"https://graph.instagram.com/v25.0/{comment_id}/replies"
+    headers = {
+        "Authorization": f"Bearer {IG_TOKEN}",
+        "Content-Type": "application/json"
+    }
+    payload = {"message": text}
+    r = requests.post(url, headers=headers, json=payload, timeout=10)
     print(f"Reply result: {r.status_code} {r.text}", flush=True)
     return r
 
@@ -57,7 +65,7 @@ def verify():
 #     IG_USER_ID = os.environ.get('IG_USER_ID')
 #     TOKEN = os.environ.get('IG_ACCESS_TOKEN')
 #     r = requests.post(
-#         f"https://graph.instagram.com/v20.0/me/subscribed_apps",
+#         f"https://graph.instagram.com/v25.0/me/subscribed_apps",
 #         data={"access_token": TOKEN, "subscribed_fields": "messages"}
 #     )
 #     return r.text
@@ -66,19 +74,41 @@ def verify():
 # def debug_status():
 #     TOKEN = os.environ.get('IG_ACCESS_TOKEN')
 #     r = requests.get(
-#         f"https://graph.instagram.com/v20.0/me/subscribed_apps",
+#         f"https://graph.instagram.com/v25.0/me/subscribed_apps",
 #         params={"access_token": TOKEN}
 #     )
 #     r2 = requests.get(
-#         f"https://graph.instagram.com/v20.0/me?fields=id,username",
+#         f"https://graph.instagram.com/v25.0/me?fields=id,username",
 #         params={"access_token": TOKEN}
 #     )
 #     return f"SUBSCRIBED: {r.text}<br><br>ME IS: {r2.text}"
+#
+# # --- ADDITIONAL DEBUG HELPERS (kept commented) ---
+# @app.route('/debug-token')
+# def debug_token():
+#     TOKEN = os.environ.get('IG_ACCESS_TOKEN')
+#     # Check token scopes & expiry
+#     r = requests.get(
+#         f"https://graph.instagram.com/v25.0/me?fields=id,username",
+#         headers={"Authorization": f"Bearer {TOKEN}"}
+#     )
+#     return f"Token check: {r.status_code} {r.text}"
+#
+# @app.route('/debug-send-test')
+# def debug_send_test():
+#     # Manually test send DM to yourself - ?to=IGSID
+#     to = request.args.get("to")
+#     TOKEN = os.environ.get('IG_ACCESS_TOKEN')
+#     url = f"https://graph.instagram.com/v25.0/me/messages"
+#     headers = {"Authorization": f"Bearer {TOKEN}", "Content-Type": "application/json"}
+#     payload = {"recipient": {"id": to}, "message": {"text": "Test from debug-send-test 💛"}}
+#     r = requests.post(url, headers=headers, json=payload)
+#     return f"{r.status_code} {r.text}"
 # --- END DEBUG CODE ---
 
 @app.route('/posts')
 def list_posts():
-    url = f"https://graph.instagram.com/v20.0/me/media?fields=id,caption,permalink&access_token={IG_TOKEN}"
+    url = f"https://graph.instagram.com/v25.0/me/media?fields=id,caption,permalink&access_token={IG_TOKEN}"
     return requests.get(url).json()
 
 @app.route('/webhook', methods=['POST'])
