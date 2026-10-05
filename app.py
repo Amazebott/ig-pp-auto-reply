@@ -13,6 +13,19 @@ COMMENT_DM_PROMPT = os.getenv("COMMENT_DM_PROMPT", "Just sent you the link in DM
 LINK_DM_TEMPLATE = os.getenv("LINK_DM_TEMPLATE", "Here you go! {LINK}")
 POST_LINKS = json.loads(os.getenv("POST_LINKS_JSON", '{"default": "https://your-link.com"}'))
 
+@app.route('/webhook', methods=['GET'])
+def verify():
+    if request.args.get("hub.verify_token") == VERIFY_TOKEN:
+        return request.args.get("hub.challenge"), 200
+    return "Forbidden", 403
+
+@app.route('/webhook', methods=['POST'])
+def webhook():
+    print("RAW WEBHOOK HIT:", request.get_data(as_text=True)[:4000], flush=True)
+    print("JSON:", request.get_json(silent=True), flush=True)
+    return "OK", 200
+
+
 def send_dm(recipient_id, text):
     if not recipient_id:
         return None
