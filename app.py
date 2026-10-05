@@ -15,16 +15,11 @@ POST_LINKS = json.loads(os.getenv("POST_LINKS_JSON", '{"default": "https://your-
 
 @app.route('/webhook', methods=['GET'])
 def verify():
-    if request.args.get("hub.verify_token") == VERIFY_TOKEN:
-        return request.args.get("hub.challenge"), 200
-    return "Forbidden", 403
-
-@app.route('/webhook', methods=['POST'])
-def webhook():
-    print("RAW WEBHOOK HIT:", request.get_data(as_text=True)[:4000], flush=True)
-    print("JSON:", request.get_json(silent=True), flush=True)
-    return "OK", 200
-
+    token = request.args.get("hub.verify_token")
+    challenge = request.args.get("hub.challenge")
+    if token == VERIFY_TOKEN:
+        return challenge, 200
+    return "Verification failed", 403
 
 def send_dm(recipient_id, text):
     if not recipient_id:
@@ -62,14 +57,6 @@ def reply_to_comment(comment_id, text):
 @app.route('/')
 def home():
     return "Bot is running - webhook ready"
-
-@app.route('/webhook', methods=['GET'])
-def verify():
-    token = request.args.get("hub.verify_token")
-    challenge = request.args.get("hub.challenge")
-    if token == VERIFY_TOKEN:
-        return challenge
-    return "Verification failed", 403
 
 # --- DEBUG CODE KEPT BUT COMMENTED OUT ---
 # @app.route('/debug-subscription')
@@ -131,7 +118,9 @@ def list_posts():
 
 @app.route('/webhook', methods=['POST'])
 def webhook():
-    data = request.get_json()
+    raw = request.get_data(as_text=True)
+    print(f"RAW WEBHOOK HIT: {raw[:4000]}", flush=True)
+    data = request.get_json(silent=True) or {}
     print(f"Received webhook: {json.dumps(data)[:3000]}", flush=True)
     if not data:
         return "OK", 200
