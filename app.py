@@ -111,6 +111,17 @@ def debug_sub_live():
     r = requests.post(f"https://graph.instagram.com/v25.0/me/subscribed_apps", headers=headers, json=payload, timeout=10)
     return r.text, 200, {'Content-Type': 'text/html'}
 
+@app.route('/debug-send-test-live')
+def debug_send_test_live():
+    to = request.args.get("to")
+    if not to:
+        return "Add ?to=IG_ID - like /debug-send-test-live?to=YOUR_ID"
+    url = f"https://graph.instagram.com/v25.0/me/messages"
+    headers = {"Authorization": f"Bearer {IG_TOKEN}", "Content-Type": "application/json"}
+    payload = {"recipient": {"id": to}, "message": {"text": "Test DM from bot 💛 works!"}}
+    r = requests.post(url, headers=headers, json=payload, timeout=10)
+    return f"{r.status_code} {r.text}"
+
 @app.route('/posts')
 def list_posts():
     url = f"https://graph.instagram.com/v25.0/me/media?fields=id,caption,permalink&access_token={IG_TOKEN}"
