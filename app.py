@@ -97,6 +97,20 @@ def home():
 # --- END DEBUG CODE ---
 
 # TEMP ENABLED FOR YOUR TEST - delete # when done testing
+
+@app.route('/debug-fix-sub-live')
+def debug_fix_sub_live():
+    headers = {"Authorization": f"Bearer {IG_TOKEN}", "Content-Type": "application/json"}
+    results = ""
+    payload_ig = {"subscribed_fields": "messages,messaging_seen,messaging_postbacks,comments"}
+    r1 = requests.post(f"https://graph.instagram.com/v25.0/29124672473803420/subscribed_apps", headers=headers, json=payload_ig, timeout=10)
+    results += f"IG sub 29124...: {r1.status_code} {r1.text}<br><br>"
+    r2 = requests.post(f"https://graph.instagram.com/v25.0/17907894192554821/subscribed_apps", headers=headers, json=payload_ig, timeout=10)
+    results += f"Page sub 17907...: {r2.status_code} {r2.text}<br><br>"
+    r3 = requests.get(f"https://graph.instagram.com/v25.0/me/subscribed_apps", headers={"Authorization": f"Bearer {IG_TOKEN}"}, timeout=10)
+    results += f"CURRENT STATUS: {r3.text}"
+    return results, 200, {'Content-Type': 'text/html'}
+    
 @app.route('/debug-status-live')
 def debug_status_live():
     headers = {"Authorization": f"Bearer {IG_TOKEN}"}
