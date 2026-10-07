@@ -13,6 +13,19 @@ COMMENT_DM_PROMPT = os.getenv("COMMENT_DM_PROMPT", "Just sent you the link in DM
 LINK_DM_TEMPLATE = os.getenv("LINK_DM_TEMPLATE", "Here you go! {LINK}")
 POST_LINKS = json.loads(os.getenv("POST_LINKS_JSON", '{"default": "https://your-link.com"}'))
 
+@app.route("/privacy")
+def privacy():
+    return """
+    <html><head><title>Privacy Policy</title></head><body>
+    <h1>Privacy Policy - Parenting Pulse</h1>
+    <p>Effective Date: 2026</p>
+    <p>We use Instagram permissions instagram_manage_comments and instagram_business_manage_messages solely to auto-reply to comments containing the keyword 'link' and send the requested link via DM.</p>
+    <p>We do not store, share, or sell personal data. Data is processed transiently to fulfill the DM request.</p>
+    <p>To request deletion: email amazebot@outlook.com and we will delete any stored comment IDs within 48 hours.</p>
+    <p>Contact: amazebot@outlook.com</p>
+    </body></html>
+    """, 200, {'Content-Type': 'text/html'}
+
 @app.route('/webhook', methods=['GET'])
 def verify():
     token = request.args.get("hub.verify_token")
