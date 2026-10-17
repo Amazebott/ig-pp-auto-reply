@@ -73,8 +73,8 @@ def send_podcast_menu(recipient_id):
             "payload": {
                 "template_type": "generic",
                 "elements": [
-                    {"title": " 【entity-Apple¦canonical_name=Apple】 Podcasts", "subtitle": "Listen on 【entity-Apple¦canonical_name=Apple】", "image_url": "https://cdn-icons-png.flaticon.com/512/831/831276.png", "default_action": {"type": "web_url", "url": APPLE_URL}, "buttons": [{"type": "web_url", "url": APPLE_URL, "title": " 【entity-Apple¦canonical_name=Apple】 Podcasts"}]},
-                    {"title": " 【entity-Spotify¦canonical_name=Spotify】", "subtitle": "Listen on 【entity-Spotify¦canonical_name=Spotify】", "image_url": "https://cdn-icons-png.flaticon.com/512/2111/2111624.png", "default_action": {"type": "web_url", "url": SPOTIFY_URL}, "buttons": [{"type": "web_url", "url": SPOTIFY_URL, "title": "Open 【entity-Spotify¦canonical_name=Spotify】"}]},
+                    {"title": " Apple Podcasts", "subtitle": "Listen on Apple", "image_url": "https://cdn-icons-png.flaticon.com/512/831/831276.png", "default_action": {"type": "web_url", "url": APPLE_URL}, "buttons": [{"type": "web_url", "url": APPLE_URL, "title": " Apple Podcasts"}]},
+                    {"title": " Spotify", "subtitle": "Listen on Spotify", "image_url": "https://cdn-icons-png.flaticon.com/512/2111/2111624.png", "default_action": {"type": "web_url", "url": SPOTIFY_URL}, "buttons": [{"type": "web_url", "url": SPOTIFY_URL, "title": "Open Spotify"}]},
                     {"title": " 【entity-YouTube Music¦canonical_name=YouTube Music】", "subtitle": "Listen on 【entity-YouTube Music¦canonical_name=YouTube Music】", "image_url": "https://cdn-icons-png.flaticon.com/512/1384/1384060.png", "default_action": {"type": "web_url", "url": YOUTUBE_MUSIC_URL}, "buttons": [{"type": "web_url", "url": YOUTUBE_MUSIC_URL, "title": " 【entity-YouTube Music¦canonical_name=YouTube Music】"}]}
                 ]
             }
@@ -93,6 +93,7 @@ def reply_to_comment(comment_id, text):
 
 # --- FOLLOWER POLLING LIKE MANYCHAT ---
 def fetch_current_followers():
+    # Count works - keep it
     try:
         url = f"https://graph.instagram.com/v25.0/{IG_USER_ID}"
         params = {"fields": "followers_count", "access_token": IG_TOKEN}
@@ -101,6 +102,8 @@ def fetch_current_followers():
     except Exception as e:
         print(f"Count error: {e}", flush=True)
 
+    # FIX: Instagram IGUser node has NO followers field - this will always be #100
+    # We keep the code but return None cleanly so logs don't spam red errors
     token_for_followers = PAGE_ACCESS_TOKEN or IG_TOKEN
     print(f"Using token for followers edge: PAGE_TOKEN length {len(PAGE_ACCESS_TOKEN)} / IG_TOKEN length {len(IG_TOKEN)} -> using len {len(token_for_followers)}", flush=True)
     
@@ -108,15 +111,15 @@ def fetch_current_followers():
         url = f"https://graph.facebook.com/v25.0/{IG_USER_ID}/followers"
         params = {"access_token": token_for_followers, "limit": 50}
         r = requests.get(url, params=params, timeout=15)
-        print(f"Followers edge: {r.status_code} {r.text[:1500]}", flush=True)
-        if r.status_code == 200:
-            data = r.json()
-            return [str(f.get("id")) for f in data.get("data", [])]
-        return None
+        # If #100 error, just log as info not error
+        if r.status_code != 200:
+            print(f"Followers edge not available on IGUser (expected #100): {r.text[:500]}", flush=True)
+            return None
+        data = r.json()
+        return [str(f.get("id")) for f in data.get("data", [])]
     except Exception as e:
         print(f"Followers edge error: {e}", flush=True)
         return None
-
 
 def check_followers_loop():
     print("Follower checker started (every 120s)", flush=True)
