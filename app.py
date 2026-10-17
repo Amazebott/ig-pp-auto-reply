@@ -5,6 +5,11 @@ from datetime import datetime
 app = Flask(__name__)
 
 # --- ENV VARS ---
+def clean_token(t):
+    if not t: return ""
+    return t.strip().strip('"').strip("'").strip()
+
+# --- ENV VARS ---
 FOLLOW_MESSAGE = os.getenv("FOLLOW_MESSAGE", "Welcome! 🎙 Enjoy our podcast on 【entity-Apple¦canonical_name=Apple】, 【entity-Spotify¦canonical_name=Spotify】, and 【entity-YouTube Music¦canonical_name=YouTube Music】! 🎧😊 Happy Listening!")
 DM_MESSAGE = os.getenv("DM_MESSAGE", "Thanks for reaching out! 💛")
 APPLE_URL = os.getenv("APPLE_URL", "https://podcasts.apple.com/")
@@ -17,10 +22,10 @@ COMMENT_DM_PROMPT = os.getenv("COMMENT_DM_PROMPT", "Just sent you the link in DM
 LINK_DM_TEMPLATE = os.getenv("LINK_DM_TEMPLATE", "Here you go! {LINK}")
 POST_LINKS = json.loads(os.getenv("POST_LINKS_JSON", '{"default": "https://your-link.com"}'))
 
-VERIFY_TOKEN = os.getenv("VERIFY_TOKEN", "").strip()
-IG_TOKEN = os.getenv("IG_ACCESS_TOKEN","").strip()
-PAGE_ACCESS_TOKEN = os.getenv("PAGE_ACCESS_TOKEN", "").strip()
-IG_USER_ID = os.getenv("IG_USER_ID", "17841405822304914").strip()
+VERIFY_TOKEN = clean_token(os.getenv("VERIFY_TOKEN", ""))
+IG_TOKEN = clean_token(os.getenv("IG_ACCESS_TOKEN",""))
+PAGE_ACCESS_TOKEN = clean_token(os.getenv("PAGE_ACCESS_TOKEN", ""))
+IG_USER_ID = clean_token(os.getenv("IG_USER_ID", "17841405822304914"))
 FOLLOWERS_FILE = "/tmp/followers.json"
 
 # --- HELPERS ---
@@ -88,7 +93,6 @@ def reply_to_comment(comment_id, text):
 
 # --- FOLLOWER POLLING LIKE MANYCHAT ---
 def fetch_current_followers():
-    # Count check - uses IG_TOKEN on IG domain - this already works for you
     try:
         url = f"https://graph.instagram.com/v25.0/{IG_USER_ID}"
         params = {"fields": "followers_count", "access_token": IG_TOKEN}
@@ -97,26 +101,18 @@ def fetch_current_followers():
     except Exception as e:
         print(f"Count error: {e}", flush=True)
 
-    # Follower LIST - must use PAGE token on FB domain, not IG token
     token_for_followers = PAGE_ACCESS_TOKEN or IG_TOKEN
-    if not token_for_followers:
-        print("No PAGE_ACCESS_TOKEN set - cannot check follower list", flush=True)
-        return None
-
+    print(f"Using token for followers edge: PAGE_TOKEN length {len(PAGE_ACCESS_TOKEN)} / IG_TOKEN length {len(IG_TOKEN)} -> using len {len(token_for_followers)}", flush=True)
+    
     try:
         url = f"https://graph.facebook.com/v25.0/{IG_USER_ID}/followers"
-        params = {"access_token": token_for_followers, "limit": 100}
+        params = {"access_token": token_for_followers, "limit": 50}
         r = requests.get(url, params=params, timeout=15)
         print(f"Followers edge: {r.status_code} {r.text[:1500]}", flush=True)
         if r.status_code == 200:
             data = r.json()
-            followers = []
-            for f in data.get("data", []):
-                followers.append(str(f.get("id")))
-            return followers
-        else:
-            print("Followers edge blocked - normal for non-partner apps, stopping follower polling spam", flush=True)
-            return None
+            return [str(f.get("id")) for f in data.get("data", [])]
+        return None
     except Exception as e:
         print(f"Followers edge error: {e}", flush=True)
         return None
