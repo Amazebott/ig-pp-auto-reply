@@ -10,13 +10,10 @@ def clean_token(t):
     return t.strip().strip('"').strip("'").strip()
 
 def get_env_ci(name, default):
-    # Try exact, upper, lower, capitalized
     for key in [name, name.upper(), name.lower(), name.capitalize(), name.upper().replace("_MESSAGE","_message"), name.lower().replace("_message","_MESSAGE")]:
         val = os.getenv(key)
         if val is not None and val != "":
-            # Also try stripped version
             return val
-    # Last try: search all env vars case-insensitively
     name_lower = name.lower()
     for k, v in os.environ.items():
         if k.lower() == name_lower and v:
@@ -40,7 +37,6 @@ IG_TOKEN = clean_token(get_env_ci("IG_ACCESS_TOKEN",""))
 PAGE_ACCESS_TOKEN = clean_token(get_env_ci("PAGE_ACCESS_TOKEN", ""))
 IG_USER_ID = clean_token(get_env_ci("IG_USER_ID", "17841405822304914"))
 FOLLOWERS_FILE = "/tmp/followers.json"
-
 
 # --- HELPERS ---
 def load_followers():
@@ -79,8 +75,10 @@ def send_podcast_menu(recipient_id):
         return None
     url = f"https://graph.instagram.com/v25.0/me/messages"
     headers = {"Authorization": f"Bearer {IG_TOKEN}", "Content-Type": "application/json"}
+    time.sleep(1)
     r1 = requests.post(url, headers=headers, json={"recipient": {"id": rid}, "message": {"text": FOLLOW_MESSAGE}}, timeout=15)
     print(f"Follow msg to {rid}: {r1.status_code} {r1.text}", flush=True)
+    time.sleep(1)
     carousel = {
         "attachment": {
             "type": "template",
@@ -89,7 +87,7 @@ def send_podcast_menu(recipient_id):
                 "elements": [
                     {"title": " Apple Podcasts", "subtitle": "Listen on Apple", "image_url": "https://cdn-icons-png.flaticon.com/512/831/831276.png", "default_action": {"type": "web_url", "url": APPLE_URL}, "buttons": [{"type": "web_url", "url": APPLE_URL, "title": " Apple Podcasts"}]},
                     {"title": " Spotify", "subtitle": "Listen on Spotify", "image_url": "https://cdn-icons-png.flaticon.com/512/2111/2111624.png", "default_action": {"type": "web_url", "url": SPOTIFY_URL}, "buttons": [{"type": "web_url", "url": SPOTIFY_URL, "title": "Open Spotify"}]},
-                    {"title": " 【entity-YouTube Music¦canonical_name=YouTube Music】", "subtitle": "Listen on 【entity-YouTube Music¦canonical_name=YouTube Music】", "image_url": "https://cdn-icons-png.flaticon.com/512/1384/1384060.png", "default_action": {"type": "web_url", "url": YOUTUBE_MUSIC_URL}, "buttons": [{"type": "web_url", "url": YOUTUBE_MUSIC_URL, "title": " 【entity-YouTube Music¦canonical_name=YouTube Music】"}]}
+                    {"title": " YouTube Music", "subtitle": "Listen on YouTube Music", "image_url": "https://cdn-icons-png.flaticon.com/512/1384/1384060.png", "default_action": {"type": "web_url", "url": YOUTUBE_MUSIC_URL}, "buttons": [{"type": "web_url", "url": YOUTUBE_MUSIC_URL, "title": " YouTube Music"}]}
                 ]
             }
         }
@@ -107,7 +105,6 @@ def reply_to_comment(comment_id, text):
 
 # --- FOLLOWER POLLING LIKE MANYCHAT ---
 def fetch_current_followers():
-    # Count works - keep it
     try:
         url = f"https://graph.instagram.com/v25.0/{IG_USER_ID}"
         params = {"fields": "followers_count", "access_token": IG_TOKEN}
@@ -115,17 +112,12 @@ def fetch_current_followers():
         print(f"Followers count check: {r.text[:500]}", flush=True)
     except Exception as e:
         print(f"Count error: {e}", flush=True)
-
-    # FIX: Instagram IGUser node has NO followers field - this will always be #100
-    # We keep the code but return None cleanly so logs don't spam red errors
     token_for_followers = PAGE_ACCESS_TOKEN or IG_TOKEN
     print(f"Using token for followers edge: PAGE_TOKEN length {len(PAGE_ACCESS_TOKEN)} / IG_TOKEN length {len(IG_TOKEN)} -> using len {len(token_for_followers)}", flush=True)
-    
     try:
         url = f"https://graph.facebook.com/v25.0/{IG_USER_ID}/followers"
         params = {"access_token": token_for_followers, "limit": 50}
         r = requests.get(url, params=params, timeout=15)
-        # If #100 error, just log as info not error
         if r.status_code != 200:
             print(f"Followers edge not available on IGUser (expected #100): {r.text[:500]}", flush=True)
             return None
@@ -203,6 +195,17 @@ def list_unfollowers_route():
 def reset_followers():
     save_followers({"followers": [], "unfollowers": [], "last_check": None})
     return "Followers list reset - will rebuild on next check"
+
+@app.route('/debug-env')
+def debug_env():
+    return jsonify({
+        "FOLLOW_MESSAGE": FOLLOW_MESSAGE[:500],
+        "DM_MESSAGE": DM_MESSAGE[:500],
+        "WELCOME_MESSAGE": WELCOME_MESSAGE[:500],
+        "IG_TOKEN_len": len(IG_TOKEN),
+        "PAGE_TOKEN_len": len(PAGE_ACCESS_TOKEN),
+        "VERIFY_TOKEN": VERIFY_TOKEN
+    })
 
 # --- DEBUG CODE KEPT BUT COMMENTED OUT ---
 # @app.route('/debug-subscription')
@@ -288,7 +291,6 @@ def list_posts():
     url = f"https://graph.instagram.com/v25.0/me/media?fields=id,caption,permalink&access_token={IG_TOKEN}"
     return requests.get(url).json()
 
-
 @app.route('/webhook', methods=['POST'])
 def webhook():
     raw = request.get_data(as_text=True)
@@ -309,8 +311,8 @@ def webhook():
             text = msg.get("message", {}).get("text", "")
             print(f"DM from {sender_id}: {text}", flush=True)
             if sender_id and text:
-                # OLD format DM - send WELCOME + menu on first DM
                 send_dm(sender_id, WELCOME_MESSAGE)
+                time.sleep(1.5)
                 send_podcast_menu(sender_id)
         for change in entry.get("changes", []):
             field = change.get("field")
@@ -326,8 +328,8 @@ def webhook():
                 print(f"DM (via changes) from {sender_id} - treating as FIRST DM", flush=True)
                 if sender_id:
                     clean_id = str(sender_id).strip("{}'\" ")
-                    # FIRST DM - this is your welcome flow
                     send_dm(clean_id, WELCOME_MESSAGE)
+                    time.sleep(1.5)
                     send_podcast_menu(clean_id)
                 continue
             val = change.get("value", {})
