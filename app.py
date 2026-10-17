@@ -288,6 +288,7 @@ def list_posts():
     url = f"https://graph.instagram.com/v25.0/me/media?fields=id,caption,permalink&access_token={IG_TOKEN}"
     return requests.get(url).json()
 
+
 @app.route('/webhook', methods=['POST'])
 def webhook():
     raw = request.get_data(as_text=True)
@@ -299,7 +300,7 @@ def webhook():
     for entry in data.get("entry", []):
         entry_id = str(entry.get("id", ""))
         if entry_id == "0":
-            print("✅ 【entity-Meta¦canonical_name=Meta】 dashboard TEST event (id=0) - returning 200 OK without sending", flush=True)
+            print("✅ Meta dashboard TEST event (id=0) - returning 200 OK without sending", flush=True)
             continue
         for msg in entry.get("messaging", []):
             if msg.get("message", {}).get("is_echo"):
@@ -308,7 +309,9 @@ def webhook():
             text = msg.get("message", {}).get("text", "")
             print(f"DM from {sender_id}: {text}", flush=True)
             if sender_id and text:
-                send_dm(sender_id, DM_MESSAGE)
+                # OLD format DM - send WELCOME + menu on first DM
+                send_dm(sender_id, WELCOME_MESSAGE)
+                send_podcast_menu(sender_id)
         for change in entry.get("changes", []):
             field = change.get("field")
             if field not in ["comments", "feed", "messages"]:
@@ -320,9 +323,11 @@ def webhook():
                     sender_id = sender_obj.get("id") or next(iter(sender_obj.keys()), None)
                 else:
                     sender_id = sender_obj
-                print(f"DM (via changes) from {sender_id} - treating as FOLLOW", flush=True)
+                print(f"DM (via changes) from {sender_id} - treating as FIRST DM", flush=True)
                 if sender_id:
                     clean_id = str(sender_id).strip("{}'\" ")
+                    # FIRST DM - this is your welcome flow
+                    send_dm(clean_id, WELCOME_MESSAGE)
                     send_podcast_menu(clean_id)
                 continue
             val = change.get("value", {})
