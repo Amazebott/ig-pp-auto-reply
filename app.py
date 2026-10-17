@@ -75,19 +75,24 @@ def send_podcast_menu(recipient_id):
         return None
     url = f"https://graph.instagram.com/v25.0/me/messages"
     headers = {"Authorization": f"Bearer {IG_TOKEN}", "Content-Type": "application/json"}
+    
     time.sleep(1)
+    
     r1 = requests.post(url, headers=headers, json={"recipient": {"id": rid}, "message": {"text": FOLLOW_MESSAGE}}, timeout=15)
     print(f"Follow msg to {rid}: {r1.status_code} {r1.text}", flush=True)
+    
     time.sleep(1)
+    
+    # No image_url = works on both mobile + desktop web
     carousel = {
         "attachment": {
             "type": "template",
             "payload": {
                 "template_type": "generic",
                 "elements": [
-                    {"title": " Apple Podcasts", "subtitle": "Listen on Apple", "image_url": "https://cdn-icons-png.flaticon.com/512/831/831276.png", "default_action": {"type": "web_url", "url": APPLE_URL}, "buttons": [{"type": "web_url", "url": APPLE_URL, "title": " Apple Podcasts"}]},
-                    {"title": " Spotify", "subtitle": "Listen on Spotify", "image_url": "https://cdn-icons-png.flaticon.com/512/2111/2111624.png", "default_action": {"type": "web_url", "url": SPOTIFY_URL}, "buttons": [{"type": "web_url", "url": SPOTIFY_URL, "title": "Open Spotify"}]},
-                    {"title": " YouTube Music", "subtitle": "Listen on YouTube Music", "image_url": "https://cdn-icons-png.flaticon.com/512/1384/1384060.png", "default_action": {"type": "web_url", "url": YOUTUBE_MUSIC_URL}, "buttons": [{"type": "web_url", "url": YOUTUBE_MUSIC_URL, "title": " YouTube Music"}]}
+                    {"title": "【entity-Apple Podcasts¦canonical_name=Apple】", "subtitle": "Listen on 【entity-Apple¦canonical_name=Apple】", "default_action": {"type": "web_url", "url": APPLE_URL}, "buttons": [{"type": "web_url", "url": APPLE_URL, "title": "【entity-Apple Podcasts¦canonical_name=Apple】"}]},
+                    {"title": "【entity-Spotify¦canonical_name=Spotify】", "subtitle": "Listen on 【entity-Spotify¦canonical_name=Spotify】", "default_action": {"type": "web_url", "url": SPOTIFY_URL}, "buttons": [{"type": "web_url", "url": SPOTIFY_URL, "title": "Open 【entity-Spotify¦canonical_name=Spotify】"}]},
+                    {"title": "【entity-YouTube Music¦canonical_name=YouTube Music】", "subtitle": "Listen on 【entity-YouTube Music¦canonical_name=YouTube Music】", "default_action": {"type": "web_url", "url": YOUTUBE_MUSIC_URL}, "buttons": [{"type": "web_url", "url": YOUTUBE_MUSIC_URL, "title": "【entity-YouTube Music¦canonical_name=YouTube Music】"}]}
                 ]
             }
         }
@@ -95,6 +100,7 @@ def send_podcast_menu(recipient_id):
     r2 = requests.post(url, headers=headers, json={"recipient": {"id": rid}, "message": carousel}, timeout=15)
     print(f"Carousel to {rid}: {r2.status_code} {r2.text}", flush=True)
     return r2
+
 
 def reply_to_comment(comment_id, text):
     url = f"https://graph.instagram.com/v25.0/{comment_id}/replies"
