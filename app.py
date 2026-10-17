@@ -97,16 +97,20 @@ def fetch_current_followers():
     except Exception as e:
         print(f"Count error: {e}", flush=True)
 
+    # Try followers list with ?access_token= not header
     try:
         url = f"https://graph.facebook.com/v25.0/{IG_USER_ID}/followers"
-        headers = {"Authorization": f"Bearer {IG_TOKEN}"}
-        r = requests.get(url, headers=headers, timeout=15)
-        print(f"Followers edge: {r.status_code} {r.text[:1000]}", flush=True)
+        params = {"access_token": IG_TOKEN, "limit": 100}
+        r = requests.get(url, params=params, timeout=15)
+        print(f"Followers edge: {r.status_code} {r.text[:1500]}", flush=True)
         if r.status_code == 200:
             data = r.json()
             for f in data.get("data", []):
                 followers.append(str(f.get("id")))
             return followers
+        else:
+            print(f"Followers edge failed - this is normal, 【entity-Meta¦canonical_name=Meta】 blocks it for non-partner apps", flush=True)
+            return None
     except Exception as e:
         print(f"Followers edge error: {e}", flush=True)
     
