@@ -88,7 +88,7 @@ def reply_to_comment(comment_id, text):
 
 # --- FOLLOWER POLLING LIKE MANYCHAT ---
 def fetch_current_followers():
-    followers = []
+    # Count check - uses IG_TOKEN on IG domain - this already works for you
     try:
         url = f"https://graph.instagram.com/v25.0/{IG_USER_ID}"
         params = {"fields": "followers_count", "access_token": IG_TOKEN}
@@ -97,24 +97,30 @@ def fetch_current_followers():
     except Exception as e:
         print(f"Count error: {e}", flush=True)
 
-    # Try followers list with ?access_token= not header
+    # Follower LIST - must use PAGE token on FB domain, not IG token
+    token_for_followers = PAGE_ACCESS_TOKEN or IG_TOKEN
+    if not token_for_followers:
+        print("No PAGE_ACCESS_TOKEN set - cannot check follower list", flush=True)
+        return None
+
     try:
         url = f"https://graph.facebook.com/v25.0/{IG_USER_ID}/followers"
-        params = {"access_token": IG_TOKEN, "limit": 100}
+        params = {"access_token": token_for_followers, "limit": 100}
         r = requests.get(url, params=params, timeout=15)
         print(f"Followers edge: {r.status_code} {r.text[:1500]}", flush=True)
         if r.status_code == 200:
             data = r.json()
+            followers = []
             for f in data.get("data", []):
                 followers.append(str(f.get("id")))
             return followers
         else:
-            print(f"Followers edge failed - this is normal, 【entity-Meta¦canonical_name=Meta】 blocks it for non-partner apps", flush=True)
+            print("Followers edge blocked - normal for non-partner apps, stopping follower polling spam", flush=True)
             return None
     except Exception as e:
         print(f"Followers edge error: {e}", flush=True)
-    
-    return None
+        return None
+
 
 def check_followers_loop():
     print("Follower checker started (every 120s)", flush=True)
