@@ -77,29 +77,55 @@ def send_podcast_menu(recipient_id):
     headers = {"Authorization": f"Bearer {IG_TOKEN}", "Content-Type": "application/json"}
     
     time.sleep(1)
-    
+    # Follow text
     r1 = requests.post(url, headers=headers, json={"recipient": {"id": rid}, "message": {"text": FOLLOW_MESSAGE}}, timeout=15)
     print(f"Follow msg to {rid}: {r1.status_code} {r1.text}", flush=True)
-    
-    time.sleep(1)
-    
-    # No image_url = works on both mobile + desktop web
-    carousel = {
+    time.sleep(0.8)
+
+    # Button 1 - 【entity-Apple¦canonical_name=Apple】
+    btn_apple = {
         "attachment": {
             "type": "template",
             "payload": {
-                "template_type": "generic",
-                "elements": [
-                    {"title": "【entity-Apple Podcasts¦canonical_name=Apple】", "subtitle": "Listen on 【entity-Apple¦canonical_name=Apple】", "default_action": {"type": "web_url", "url": APPLE_URL}, "buttons": [{"type": "web_url", "url": APPLE_URL, "title": "【entity-Apple Podcasts¦canonical_name=Apple】"}]},
-                    {"title": "【entity-Spotify¦canonical_name=Spotify】", "subtitle": "Listen on 【entity-Spotify¦canonical_name=Spotify】", "default_action": {"type": "web_url", "url": SPOTIFY_URL}, "buttons": [{"type": "web_url", "url": SPOTIFY_URL, "title": "Open 【entity-Spotify¦canonical_name=Spotify】"}]},
-                    {"title": "【entity-YouTube Music¦canonical_name=YouTube Music】", "subtitle": "Listen on 【entity-YouTube Music¦canonical_name=YouTube Music】", "default_action": {"type": "web_url", "url": YOUTUBE_MUSIC_URL}, "buttons": [{"type": "web_url", "url": YOUTUBE_MUSIC_URL, "title": "【entity-YouTube Music¦canonical_name=YouTube Music】"}]}
-                ]
+                "template_type": "button",
+                "text": "🎧 Listen on 【entity-Apple¦canonical_name=Apple】 Podcasts",
+                "buttons": [{"type": "web_url", "url": APPLE_URL, "title": "【entity-Apple¦canonical_name=Apple】"}]
             }
         }
     }
-    r2 = requests.post(url, headers=headers, json={"recipient": {"id": rid}, "message": carousel}, timeout=15)
-    print(f"Carousel to {rid}: {r2.status_code} {r2.text}", flush=True)
-    return r2
+    r2 = requests.post(url, headers=headers, json={"recipient": {"id": rid}, "message": btn_apple}, timeout=10)
+    print(f"【entity-Apple¦canonical_name=Apple】 btn to {rid}: {r2.status_code} {r2.text}", flush=True)
+    time.sleep(0.8)
+
+    # Button 2 - 【entity-Spotify¦canonical_name=Spotify】
+    btn_spotify = {
+        "attachment": {
+            "type": "template",
+            "payload": {
+                "template_type": "button",
+                "text": "🎧 Listen on 【entity-Spotify¦canonical_name=Spotify】",
+                "buttons": [{"type": "web_url", "url": SPOTIFY_URL, "title": "【entity-Spotify¦canonical_name=Spotify】"}]
+            }
+        }
+    }
+    r3 = requests.post(url, headers=headers, json={"recipient": {"id": rid}, "message": btn_spotify}, timeout=10)
+    print(f"【entity-Spotify¦canonical_name=Spotify】 btn to {rid}: {r3.status_code} {r3.text}", flush=True)
+    time.sleep(0.8)
+
+    # Button 3 - YouTube
+    btn_yt = {
+        "attachment": {
+            "type": "template",
+            "payload": {
+                "template_type": "button",
+                "text": "🎧 Listen on YouTube Music",
+                "buttons": [{"type": "web_url", "url": YOUTUBE_MUSIC_URL, "title": "YouTube"}]
+            }
+        }
+    }
+    r4 = requests.post(url, headers=headers, json={"recipient": {"id": rid}, "message": btn_yt}, timeout=10)
+    print(f"YouTube btn to {rid}: {r4.status_code} {r4.text}", flush=True)
+    return r4
 
 
 def reply_to_comment(comment_id, text):
