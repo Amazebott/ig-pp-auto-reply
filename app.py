@@ -20,7 +20,7 @@ POST_LINKS = json.loads(os.getenv("POST_LINKS_JSON", '{"default": "https://your-
 VERIFY_TOKEN = os.getenv("VERIFY_TOKEN", "").strip()
 IG_TOKEN = os.getenv("IG_ACCESS_TOKEN","").strip()
 PAGE_ACCESS_TOKEN = os.getenv("PAGE_ACCESS_TOKEN", "").strip()
-IG_USER_ID = os.getenv("IG_USER_ID", "17841405822304914").strip() # YOUR IG BUSINESS ID - set in Render
+IG_USER_ID = os.getenv("IG_USER_ID", "17841405822304914").strip()
 FOLLOWERS_FILE = "/tmp/followers.json"
 
 # --- HELPERS ---
@@ -29,8 +29,9 @@ def load_followers():
         if os.path.exists(FOLLOWERS_FILE):
             with open(FOLLOWERS_FILE, "r") as f:
                 return json.load(f)
-    except: pass
-    return {"followers": [], "unfollowers": []}
+    except:
+        pass
+    return {"followers": [], "unfollowers": [], "last_check": None}
 
 def save_followers(data):
     try:
@@ -40,9 +41,11 @@ def save_followers(data):
         print(f"Save error: {e}", flush=True)
 
 def send_dm(recipient_id, text):
-    if not recipient_id: return None
+    if not recipient_id:
+        return None
     rid = str(recipient_id).strip("{}'\" ")
-    if rid in ["0", "23245", "12334"]: return None
+    if rid in ["0", "23245", "12334"]:
+        return None
     url = f"https://graph.instagram.com/v25.0/me/messages"
     headers = {"Authorization": f"Bearer {IG_TOKEN}", "Content-Type": "application/json"}
     r = requests.post(url, headers=headers, json={"recipient": {"id": rid}, "message": {"text": text}}, timeout=10)
@@ -50,18 +53,28 @@ def send_dm(recipient_id, text):
     return r
 
 def send_podcast_menu(recipient_id):
-    if not recipient_id: return None
+    if not recipient_id:
+        return None
     rid = str(recipient_id).strip("{}'\" ")
-    if rid in ["0", "23245", "12334"]: return None
+    if rid in ["0", "23245", "12334"]:
+        return None
     url = f"https://graph.instagram.com/v25.0/me/messages"
     headers = {"Authorization": f"Bearer {IG_TOKEN}", "Content-Type": "application/json"}
     r1 = requests.post(url, headers=headers, json={"recipient": {"id": rid}, "message": {"text": FOLLOW_MESSAGE}}, timeout=15)
     print(f"Follow msg to {rid}: {r1.status_code} {r1.text}", flush=True)
-    carousel = {"attachment": {"type": "template", "payload": {"template_type": "generic", "elements": [
-        {"title": "【entity-Apple Podcasts¦canonical_name=Apple】", "subtitle": "Listen on 【entity-Apple¦canonical_name=Apple】", "image_url": "https://cdn-icons-png.flaticon.com/512/831/831276.png", "default_action": {"type": "web_url", "url": APPLE_URL}, "buttons": [{"type": "web_url", "url": APPLE_URL, "title": "【entity-Apple Podcasts¦canonical_name=Apple】"}]},
-        {"title": " 【entity-Spotify¦canonical_name=Spotify】", "subtitle": "Listen on 【entity-Spotify¦canonical_name=Spotify】", "image_url": "https://cdn-icons-png.flaticon.com/512/2111/2111624.png", "default_action": {"type": "web_url", "url": SPOTIFY_URL}, "buttons": [{"type": "web_url", "url": SPOTIFY_URL, "title": "Open 【entity-Spotify¦canonical_name=Spotify】"}]},
-        {"title": " 【entity-YouTube Music¦canonical_name=YouTube Music】", "subtitle": "Listen on 【entity-YouTube Music¦canonical_name=YouTube Music】", "image_url": "https://cdn-icons-png.flaticon.com/512/1384/1384060.png", "default_action": {"type": "web_url", "url": YOUTUBE_MUSIC_URL}, "buttons": [{"type": "web_url", "url": YOUTUBE_MUSIC_URL, "title": " 【entity-YouTube Music¦canonical_name=YouTube Music】"}]}
-    ]}}}
+    carousel = {
+        "attachment": {
+            "type": "template",
+            "payload": {
+                "template_type": "generic",
+                "elements": [
+                    {"title": " 【entity-Apple¦canonical_name=Apple】 Podcasts", "subtitle": "Listen on 【entity-Apple¦canonical_name=Apple】", "image_url": "https://cdn-icons-png.flaticon.com/512/831/831276.png", "default_action": {"type": "web_url", "url": APPLE_URL}, "buttons": [{"type": "web_url", "url": APPLE_URL, "title": " 【entity-Apple¦canonical_name=Apple】 Podcasts"}]},
+                    {"title": " 【entity-Spotify¦canonical_name=Spotify】", "subtitle": "Listen on 【entity-Spotify¦canonical_name=Spotify】", "image_url": "https://cdn-icons-png.flaticon.com/512/2111/2111624.png", "default_action": {"type": "web_url", "url": SPOTIFY_URL}, "buttons": [{"type": "web_url", "url": SPOTIFY_URL, "title": "Open 【entity-Spotify¦canonical_name=Spotify】"}]},
+                    {"title": " 【entity-YouTube Music¦canonical_name=YouTube Music】", "subtitle": "Listen on 【entity-YouTube Music¦canonical_name=YouTube Music】", "image_url": "https://cdn-icons-png.flaticon.com/512/1384/1384060.png", "default_action": {"type": "web_url", "url": YOUTUBE_MUSIC_URL}, "buttons": [{"type": "web_url", "url": YOUTUBE_MUSIC_URL, "title": " 【entity-YouTube Music¦canonical_name=YouTube Music】"}]}
+                ]
+            }
+        }
+    }
     r2 = requests.post(url, headers=headers, json={"recipient": {"id": rid}, "message": carousel}, timeout=15)
     print(f"Carousel to {rid}: {r2.status_code} {r2.text}", flush=True)
     return r2
@@ -75,9 +88,7 @@ def reply_to_comment(comment_id, text):
 
 # --- FOLLOWER POLLING LIKE MANYCHAT ---
 def fetch_current_followers():
-    # Try 2 endpoints - ManyChat uses the second one
     followers = []
-    # Endpoint 1: business discovery followers (needs token)
     try:
         url = f"https://graph.instagram.com/v25.0/{IG_USER_ID}"
         params = {"fields": "followers_count", "access_token": IG_TOKEN}
@@ -86,8 +97,6 @@ def fetch_current_followers():
     except Exception as e:
         print(f"Count error: {e}", flush=True)
 
-    # Endpoint 2: followers list (only works if you're approved partner OR with instagram_manage_insights)
-    # We try followers edge - if 【entity-Meta¦canonical_name=Meta】 blocks it, we fallback to mentions method
     try:
         url = f"https://graph.facebook.com/v25.0/{IG_USER_ID}/followers"
         headers = {"Authorization": f"Bearer {IG_TOKEN}"}
@@ -101,63 +110,56 @@ def fetch_current_followers():
     except Exception as e:
         print(f"Followers edge error: {e}", flush=True)
     
-    # FALLBACK: Use messaging history as proxy (we build list from anyone who ever DMed you)
-    # This is how most bots do it without partner access
     return None
 
 def check_followers_loop():
-    print("🔄 Follower checker started (every 120s)", flush=True)
+    print("Follower checker started (every 120s)", flush=True)
     while True:
         try:
             stored = load_followers()
             old_followers = set(stored.get("followers", []))
-            
             current = fetch_current_followers()
-            
             if current is None:
-                print("Followers edge not available - using DM history as follower proxy. Add MANYCHAT method: will auto-welcome on first DM.", flush=True)
+                print("Followers edge not available - using DM history proxy", flush=True)
                 time.sleep(120)
                 continue
-
             new_followers = set(current) - old_followers
             unfollowed = old_followers - set(current)
-
             if new_followers:
-                print(f"🎉 NEW FOLLOWERS: {new_followers}", flush=True)
+                print(f"NEW FOLLOWERS: {new_followers}", flush=True)
                 for fid in new_followers:
                     send_podcast_menu(fid)
-
             if unfollowed:
-                print(f"💔 UNFOLLOWED: {unfollowed}", flush=True)
+                print(f"UNFOLLOWED: {unfollowed}", flush=True)
                 stored["unfollowers"] = list(set(stored.get("unfollowers", [])) | unfollowed)
-
             stored["followers"] = current
             stored["last_check"] = datetime.now().isoformat()
             save_followers(stored)
-
         except Exception as e:
             print(f"Follower loop error: {e}", flush=True)
-        
-        time.sleep(120) # Check every 2 mins like ManyChat
+        time.sleep(120)
 
-# Start background thread
 threading.Thread(target=check_followers_loop, daemon=True).start()
 
-# --- ROUTES ---
 @app.route("/privacy")
 def privacy():
-    return """<html><head><title>Privacy Policy</title></head><body>
-    <h1>Privacy Policy - Parenting Pulse</h1><p>Effective Date: 2026</p>
+    return """
+    <html><head><title>Privacy Policy</title></head><body>
+    <h1>Privacy Policy - Parenting Pulse</h1>
+    <p>Effective Date: 2026</p>
     <p>We use Instagram permissions instagram_manage_comments and instagram_business_manage_messages solely to auto-reply to comments containing the keyword 'link' and send the requested link via DM.</p>
     <p>We do not store, share, or sell personal data. Data is processed transiently to fulfill the DM request.</p>
     <p>To request deletion: email amazebot@outlook.com and we will delete any stored comment IDs within 48 hours.</p>
-    <p>Contact: amazebot@outlook.com</p></body></html>""", 200, {'Content-Type': 'text/html'}
+    <p>Contact: amazebot@outlook.com</p>
+    </body></html>
+    """, 200, {'Content-Type': 'text/html'}
 
 @app.route('/webhook', methods=['GET'])
 def verify():
     token = request.args.get("hub.verify_token")
     challenge = request.args.get("hub.challenge")
-    if token == VERIFY_TOKEN: return challenge, 200
+    if token == VERIFY_TOKEN:
+        return challenge, 200
     return "Verification failed", 403
 
 @app.route('/')
@@ -176,7 +178,7 @@ def list_unfollowers_route():
 
 @app.route('/followers/reset')
 def reset_followers():
-    save_followers({"followers": [], "unfollowers": []})
+    save_followers({"followers": [], "unfollowers": [], "last_check": None})
     return "Followers list reset - will rebuild on next check"
 
 # --- DEBUG CODE KEPT BUT COMMENTED OUT ---
@@ -244,7 +246,8 @@ def debug_sub_live():
 @app.route('/debug-send-test-live')
 def debug_send_test_live():
     to = request.args.get("to")
-    if not to: return "Add ?to=IG_ID - like /debug-send-test-live?to=YOUR_ID"
+    if not to:
+        return "Add ?to=IG_ID - like /debug-send-test-live?to=YOUR_ID"
     url = f"https://graph.instagram.com/v25.0/me/messages"
     headers = {"Authorization": f"Bearer {IG_TOKEN}", "Content-Type": "application/json"}
     payload = {"recipient": {"id": to}, "message": {"text": "Test DM from bot 💛 works!"}}
@@ -268,14 +271,16 @@ def webhook():
     print(f"RAW WEBHOOK HIT: {raw[:4000]}", flush=True)
     data = request.get_json(silent=True) or {}
     print(f"Received webhook: {json.dumps(data)[:3000]}", flush=True)
-    if not data: return "OK", 200
+    if not data:
+        return "OK", 200
     for entry in data.get("entry", []):
         entry_id = str(entry.get("id", ""))
         if entry_id == "0":
-            print("✅ Meta dashboard TEST event (id=0) - returning 200 OK without sending", flush=True)
+            print("✅ 【entity-Meta¦canonical_name=Meta】 dashboard TEST event (id=0) - returning 200 OK without sending", flush=True)
             continue
         for msg in entry.get("messaging", []):
-            if msg.get("message", {}).get("is_echo"): continue
+            if msg.get("message", {}).get("is_echo"):
+                continue
             sender_id = msg.get("sender", {}).get("id")
             text = msg.get("message", {}).get("text", "")
             print(f"DM from {sender_id}: {text}", flush=True)
@@ -283,8 +288,34 @@ def webhook():
                 send_dm(sender_id, DM_MESSAGE)
         for change in entry.get("changes", []):
             field = change.get("field")
-            if field not in ["comments", "feed", "messages"]: continue
+            if field not in ["comments", "feed", "messages"]:
+                continue
             if field == "messages":
                 val = change.get("value", {})
                 sender_obj = val.get("sender", {})
-                if isinstance(sender_obj
+                if isinstance(sender_obj, dict):
+                    sender_id = sender_obj.get("id") or next(iter(sender_obj.keys()), None)
+                else:
+                    sender_id = sender_obj
+                print(f"DM (via changes) from {sender_id} - treating as FOLLOW", flush=True)
+                if sender_id:
+                    clean_id = str(sender_id).strip("{}'\" ")
+                    send_podcast_menu(clean_id)
+                continue
+            val = change.get("value", {})
+            media_id = str(val.get("media_id") or val.get("post_id") or "")
+            comment_text = val.get("text", "").lower()
+            comment_id = val.get("comment_id") or val.get("id")
+            from_id = val.get("from", {}).get("id")
+            print(f"Comment '{comment_text}' on {media_id}", flush=True)
+            if "link" in comment_text and comment_id:
+                link_to_send = POST_LINKS.get(media_id) or POST_LINKS.get("default")
+                reply_to_comment(comment_id, COMMENT_DM_PROMPT)
+                if from_id:
+                    send_dm(from_id, LINK_DM_TEMPLATE.replace("{LINK}", link_to_send))
+            elif comment_id and val.get("verb") == "add":
+                reply_to_comment(comment_id, COMMENT_MESSAGE)
+    return "OK", 200
+    
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=10000)
