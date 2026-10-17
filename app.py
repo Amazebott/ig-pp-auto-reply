@@ -4,29 +4,43 @@ from datetime import datetime
 
 app = Flask(__name__)
 
-# --- ENV VARS ---
+# --- ENV VARS - CASE INSENSITIVE ---
 def clean_token(t):
     if not t: return ""
     return t.strip().strip('"').strip("'").strip()
 
-# --- ENV VARS ---
-FOLLOW_MESSAGE = os.getenv("FOLLOW_MESSAGE", "Welcome! 🎙 Enjoy our podcast on 【entity-Apple¦canonical_name=Apple】, 【entity-Spotify¦canonical_name=Spotify】, and 【entity-YouTube Music¦canonical_name=YouTube Music】! 🎧😊 Happy Listening!")
-DM_MESSAGE = os.getenv("DM_MESSAGE", "Thanks for reaching out! 💛")
-APPLE_URL = os.getenv("APPLE_URL", "https://podcasts.apple.com/")
-SPOTIFY_URL = os.getenv("SPOTIFY_URL", "https://open.spotify.com/")
-YOUTUBE_MUSIC_URL = os.getenv("YOUTUBE_MUSIC_URL", "https://music.youtube.com/")
+def get_env_ci(name, default):
+    # Try exact, upper, lower, capitalized
+    for key in [name, name.upper(), name.lower(), name.capitalize(), name.upper().replace("_MESSAGE","_message"), name.lower().replace("_message","_MESSAGE")]:
+        val = os.getenv(key)
+        if val is not None and val != "":
+            # Also try stripped version
+            return val
+    # Last try: search all env vars case-insensitively
+    name_lower = name.lower()
+    for k, v in os.environ.items():
+        if k.lower() == name_lower and v:
+            return v
+    return default
 
-WELCOME_MESSAGE = os.getenv("WELCOME_MESSAGE", "Hey! Thanks for DMing 💛")
-COMMENT_MESSAGE = os.getenv("COMMENT_MESSAGE", "Thanks so much! 💛")
-COMMENT_DM_PROMPT = os.getenv("COMMENT_DM_PROMPT", "Just sent you the link in DMs! 💛")
-LINK_DM_TEMPLATE = os.getenv("LINK_DM_TEMPLATE", "Here you go! {LINK}")
-POST_LINKS = json.loads(os.getenv("POST_LINKS_JSON", '{"default": "https://your-link.com"}'))
+FOLLOW_MESSAGE = get_env_ci("FOLLOW_MESSAGE", "Welcome! 🎙 Enjoy our podcast on 【entity-Apple¦canonical_name=Apple】, Spotify, and YouTube Music! 🎧😊 Happy Listening!")
+DM_MESSAGE = get_env_ci("DM_MESSAGE", "Thanks for reaching out! 💛")
+APPLE_URL = get_env_ci("APPLE_URL", "https://podcasts.apple.com/")
+SPOTIFY_URL = get_env_ci("SPOTIFY_URL", "https://open.spotify.com/")
+YOUTUBE_MUSIC_URL = get_env_ci("YOUTUBE_MUSIC_URL", "https://music.youtube.com/")
 
-VERIFY_TOKEN = clean_token(os.getenv("VERIFY_TOKEN", ""))
-IG_TOKEN = clean_token(os.getenv("IG_ACCESS_TOKEN",""))
-PAGE_ACCESS_TOKEN = clean_token(os.getenv("PAGE_ACCESS_TOKEN", ""))
-IG_USER_ID = clean_token(os.getenv("IG_USER_ID", "17841405822304914"))
+WELCOME_MESSAGE = get_env_ci("WELCOME_MESSAGE", "Hey! Thanks for DMing 💛")
+COMMENT_MESSAGE = get_env_ci("COMMENT_MESSAGE", "Thanks so much! 💛")
+COMMENT_DM_PROMPT = get_env_ci("COMMENT_DM_PROMPT", "Just sent you the link in DMs! 💛")
+LINK_DM_TEMPLATE = get_env_ci("LINK_DM_TEMPLATE", "Here you go! {LINK}")
+POST_LINKS = json.loads(get_env_ci("POST_LINKS_JSON", '{"default": "https://your-link.com"}'))
+
+VERIFY_TOKEN = clean_token(get_env_ci("VERIFY_TOKEN", ""))
+IG_TOKEN = clean_token(get_env_ci("IG_ACCESS_TOKEN",""))
+PAGE_ACCESS_TOKEN = clean_token(get_env_ci("PAGE_ACCESS_TOKEN", ""))
+IG_USER_ID = clean_token(get_env_ci("IG_USER_ID", "17841405822304914"))
 FOLLOWERS_FILE = "/tmp/followers.json"
+
 
 # --- HELPERS ---
 def load_followers():
