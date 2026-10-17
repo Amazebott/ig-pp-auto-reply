@@ -3,9 +3,12 @@ from flask import Flask, request
 
 app = Flask(__name__)
 
-VERIFY_TOKEN = os.getenv("VERIFY_TOKEN", "").strip()
-IG_TOKEN = os.getenv("IG_ACCESS_TOKEN","").strip()  # IGAA token for parentingpulse.pp
-PAGE_ACCESS_TOKEN = os.getenv("PAGE_ACCESS_TOKEN", "").strip() # kept for reference
+#VAriable from environment
+FOLLOW_MESSAGE = os.getenv("FOLLOW_MESSAGE", "Welcome! 🎙 Enjoy our podcast on 【entity-Apple¦canonical_name=Apple】, 【entity-Spotify¦canonical_name=Spotify】, and YouTube Music! 🎧😊 Happy Listening!")
+DM_MESSAGE = os.getenv("DM_MESSAGE", "Thanks for reaching out! 💛")
+APPLE_URL = os.getenv("APPLE_URL", "https://podcasts.apple.com/")
+SPOTIFY_URL = os.getenv("SPOTIFY_URL", "https://open.spotify.com/")
+YOUTUBE_MUSIC_URL = os.getenv("YOUTUBE_MUSIC_URL", "https://music.youtube.com/")
 
 WELCOME_MESSAGE = os.getenv("WELCOME_MESSAGE", "Hey! Thanks for DMing 💛")
 COMMENT_MESSAGE = os.getenv("COMMENT_MESSAGE", "Thanks so much! 💛")
@@ -13,13 +16,17 @@ COMMENT_DM_PROMPT = os.getenv("COMMENT_DM_PROMPT", "Just sent you the link in DM
 LINK_DM_TEMPLATE = os.getenv("LINK_DM_TEMPLATE", "Here you go! {LINK}")
 POST_LINKS = json.loads(os.getenv("POST_LINKS_JSON", '{"default": "https://your-link.com"}'))
 
+VERIFY_TOKEN = os.getenv("VERIFY_TOKEN", "").strip()
+IG_TOKEN = os.getenv("IG_ACCESS_TOKEN","").strip()  # IGAA token for parentingpulse.pp
+PAGE_ACCESS_TOKEN = os.getenv("PAGE_ACCESS_TOKEN", "").strip() # kept for reference
+
 @app.route("/privacy")
 def privacy():
     return """
     <html><head><title>Privacy Policy</title></head><body>
     <h1>Privacy Policy - Parenting Pulse</h1>
     <p>Effective Date: 2026</p>
-    <p>We use Instagram permissions instagram_manage_comments and instagram_business_manage_messages solely to auto-reply to comments containing the keyword 'link' and send the requested link via DM.</p>
+    <p>We use 【entity-Instagram¦canonical_name=Instagram】 permissions instagram_manage_comments and instagram_business_manage_messages solely to auto-reply to comments containing the keyword 'link' and send the requested link via DM.</p>
     <p>We do not store, share, or sell personal data. Data is processed transiently to fulfill the DM request.</p>
     <p>To request deletion: email amazebot@outlook.com and we will delete any stored comment IDs within 48 hours.</p>
     <p>Contact: amazebot@outlook.com</p>
@@ -54,6 +61,41 @@ def send_dm(recipient_id, text):
     r = requests.post(url, headers=headers, json=payload, timeout=10)
     print(f"Send DM result: {r.status_code} {r.text}", flush=True)
     return r
+
+def send_podcast_menu(recipient_id):
+    if not recipient_id:
+        return None
+    rid = str(recipient_id).strip("{}'\" ")
+    if rid in ["0", "23245", "12334"]:
+        return None
+    url = f"https://graph.instagram.com/v25.0/me/messages"
+    headers = {
+        "Authorization": f"Bearer {IG_TOKEN}",
+        "Content-Type": "application/json"
+    }
+
+    # 1. FOLLOW_MESSAGE
+    print(f"Sending FOLLOW to {rid}: {FOLLOW_MESSAGE}", flush=True)
+    r1 = requests.post(url, headers=headers, json={"recipient": {"id": rid}, "message": {"text": FOLLOW_MESSAGE}}, timeout=10)
+    print(f"Follow msg result: {r1.status_code} {r1.text}", flush=True)
+
+    # 2. Carousel with 3 logos
+    carousel = {
+        "attachment": {
+            "type": "template",
+            "payload": {
+                "template_type": "generic",
+                "elements": [
+                    {"title": "【entity-Apple¦canonical_name=Apple】 Podcasts", "subtitle": "Listen on Apple", "image_url": "https://cdn-icons-png.flaticon.com/512/831/831276.png", "default_action": {"type": "web_url", "url": APPLE_URL}, "buttons": [{"type": "web_url", "url": APPLE_URL, "title": "Apple Podcasts"}]},
+                    {"title": " Spotify", "subtitle": "Listen on Spotify", "image_url": "https://cdn-icons-png.flaticon.com/512/2111/2111624.png", "default_action": {"type": "web_url", "url": SPOTIFY_URL}, "buttons": [{"type": "web_url", "url": SPOTIFY_URL, "title": "Open Spotify"}]},
+                    {"title": "YouTube Music", "subtitle": "Listen on YouTube Music", "image_url": "https://cdn-icons-png.flaticon.com/512/1384/1384060.png", "default_action": {"type": "web_url", "url": YOUTUBE_MUSIC_URL}, "buttons": [{"type": "web_url", "url": YOUTUBE_MUSIC_URL, "title": "YouTube Music"}]}
+                ]
+            }
+        }
+    }
+    r2 = requests.post(url, headers=headers, json={"recipient": {"id": rid}, "message": carousel}, timeout=10)
+    print(f"Carousel result: {r2.status_code} {r2.text}", flush=True)
+    return r2
 
 def reply_to_comment(comment_id, text):
     print(f"Replying to comment {comment_id}: {text}", flush=True)
@@ -165,8 +207,10 @@ def webhook():
     for entry in data.get("entry", []):
         entry_id = str(entry.get("id", ""))
         if entry_id == "0":
-            print("✅ Meta dashboard TEST event (id=0) - returning 200 OK without sending", flush=True)
+            print("✅ 【entity-Meta¦canonical_name=Meta】 dashboard TEST event (id=0) - returning 200 OK without sending", flush=True)
             continue
+
+        # 1. 【entity-INSTAGRAM¦canonical_name=Instagram】 DM -> uses DM_MESSAGE
         for msg in entry.get("messaging", []):
             if msg.get("message", {}).get("is_echo"):
                 continue
@@ -174,11 +218,14 @@ def webhook():
             text = msg.get("message", {}).get("text", "")
             print(f"DM from {sender_id}: {text}", flush=True)
             if sender_id and text:
-                send_dm(sender_id, WELCOME_MESSAGE)
+                send_dm(sender_id, DM_MESSAGE)
+
         for change in entry.get("changes", []):
             field = change.get("field")
             if field not in ["comments", "feed", "messages"]:
                 continue
+
+            # 2. 【entity-INSTAGRAM¦canonical_name=Instagram】 FOLLOW -> uses FOLLOW_MESSAGE + carousel
             if field == "messages":
                 val = change.get("value", {})
                 sender_obj = val.get("sender", {})
@@ -188,11 +235,12 @@ def webhook():
                     sender_id = sender_obj
                 msg_obj = val.get("message", {})
                 msg_text = msg_obj.get("text", "") if isinstance(msg_obj, dict) else ""
-                print(f"DM (via changes) from {sender_id}: {msg_text}", flush=True)
+                print(f"DM (via changes) from {sender_id}: {msg_text} - treating as FOLLOW", flush=True)
                 if sender_id:
                     clean_id = str(sender_id).strip("{}'\" ")
-                    send_dm(clean_id, WELCOME_MESSAGE)
+                    send_podcast_menu(clean_id)
                 continue
+
             val = change.get("value", {})
             media_id = str(val.get("media_id") or val.get("post_id") or "")
             comment_text = val.get("text", "").lower()
@@ -207,6 +255,6 @@ def webhook():
             elif comment_id and val.get("verb") == "add":
                 reply_to_comment(comment_id, COMMENT_MESSAGE)
     return "OK", 200
-
+    
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=10000)
