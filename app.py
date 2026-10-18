@@ -68,7 +68,7 @@ def send_dm(recipient_id, text):
     return r
 
 def send_podcast_menu(recipient_id):
-    # FOLLOW FLOW - sends WELCOME + FOLLOW + 3 links
+    # FOLLOW FLOW - WELCOME + BUTTONS WITH HYPERLINKS (no big preview)
     if not recipient_id:
         return None
     rid = str(recipient_id).strip("{}'\" ")
@@ -76,21 +76,31 @@ def send_podcast_menu(recipient_id):
         return None
     url = f"https://graph.instagram.com/v25.0/me/messages"
     headers = {"Authorization": f"Bearer {IG_TOKEN}", "Content-Type": "application/json"}
-    
+
     r1 = requests.post(url, headers=headers, json={"recipient": {"id": rid}, "message": {"text": WELCOME_MESSAGE}}, timeout=10)
     print(f"WELCOME to {rid}: {r1.status_code} {r1.text}", flush=True)
-    time.sleep(1)
-
-    r2 = requests.post(url, headers=headers, json={"recipient": {"id": rid}, "message": {"text": FOLLOW_MESSAGE}}, timeout=10)
-    print(f"FOLLOW to {rid}: {r2.status_code} {r2.text}", flush=True)
     time.sleep(0.8)
 
-    r3 = requests.post(url, headers=headers, json={"recipient": {"id": rid}, "message": {"text": f"【entity-Apple Podcasts¦canonical_name=Apple】:\n{APPLE_URL}"}}, timeout=10)
-    time.sleep(0.5)
-    r4 = requests.post(url, headers=headers, json={"recipient": {"id": rid}, "message": {"text": f"【entity-Spotify¦canonical_name=Spotify】:\n{SPOTIFY_URL}"}}, timeout=10)
-    time.sleep(0.5)
-    r5 = requests.post(url, headers=headers, json={"recipient": {"id": rid}, "message": {"text": f"【entity-YouTube Music¦canonical_name=YouTube Music】:\n{YOUTUBE_MUSIC_URL}"}}, timeout=10)
-    return r5
+    button_payload = {
+        "recipient": {"id": rid},
+        "message": {
+            "attachment": {
+                "type": "template",
+                "payload": {
+                    "template_type": "button",
+                    "text": FOLLOW_MESSAGE,
+                    "buttons": [
+                        {"type": "web_url", "url": APPLE_URL, "title": "【entity-Apple Podcasts¦canonical_name=Apple】"},
+                        {"type": "web_url", "url": SPOTIFY_URL, "title": "【entity-Spotify¦canonical_name=Spotify】"},
+                        {"type": "web_url", "url": YOUTUBE_MUSIC_URL, "title": "【entity-YouTube Music¦canonical_name=YouTube Music】"}
+                    ]
+                }
+            }
+        }
+    }
+    r2 = requests.post(url, headers=headers, json=button_payload, timeout=10)
+    print(f"BUTTONS to {rid}: {r2.status_code} {r2.text}", flush=True)
+    return r2
 
 def reply_to_comment(comment_id, text):
     url = f"https://graph.instagram.com/v25.0/{comment_id}/replies"
@@ -158,7 +168,7 @@ def privacy():
     <html><head><title>Privacy Policy</title></head><body>
     <h1>Privacy Policy - Parenting Pulse</h1>
     <p>Effective Date: 2026</p>
-    <p>We use 【entity-Instagram¦canonical_name=Instagram】 permissions instagram_manage_comments and instagram_business_manage_messages solely to auto-reply to comments containing the keyword 'link' and send the requested link via DM.</p>
+    <p>We use Instagram permissions instagram_manage_comments and instagram_business_manage_messages solely to auto-reply to comments containing the keyword 'link' and send the requested link via DM.</p>
     <p>We do not store, share, or sell personal data. Data is processed transiently to fulfill the DM request.</p>
     <p>To request deletion: email amazebot@outlook.com and we will delete any stored comment IDs within 48 hours.</p>
     <p>Contact: amazebot@outlook.com</p>
@@ -299,10 +309,10 @@ def webhook():
     for entry in data.get("entry", []):
         entry_id = str(entry.get("id", ""))
         if entry_id == "0":
-            print("Meta dashboard TEST event (id=0) - returning 200 OK without sending", flush=True)
+            print("【entity-Meta¦canonical_name=Meta】 dashboard TEST event (id=0) - returning 200 OK without sending", flush=True)
             continue
         
-        # --- 1. MESSAGING (DMs) -> TESTING MENU ---
+        # --- 1. MESSAGING (DMs) ---
         for msg in entry.get("messaging", []):
             if msg.get("message", {}).get("is_echo"):
                 continue
@@ -310,9 +320,10 @@ def webhook():
             text = msg.get("message", {}).get("text", "")
             print(f"DM from {sender_id}: {text}", flush=True)
             if sender_id and text:
-                 #==> DM TEST
+                # PROD
                 #send_dm(sender_id, DM_MESSAGE)
-                send_podcast_menu(sender_id)
+                # TEST BUTTONS - uncomment to test welcome+buttons via DM:
+                 send_podcast_menu(sender_id)
 
         # --- 2. CHANGES (comments + messages via changes) ---
         for change in entry.get("changes", []):
