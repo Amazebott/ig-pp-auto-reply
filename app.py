@@ -68,7 +68,6 @@ def send_dm(recipient_id, text):
     return r
 
 def send_podcast_menu(recipient_id):
-    # FOLLOW FLOW - WELCOME + BUTTONS WITH HYPERLINKS (no big preview)
     if not recipient_id:
         return None
     rid = str(recipient_id).strip("{}'\" ")
@@ -81,24 +80,30 @@ def send_podcast_menu(recipient_id):
     print(f"WELCOME to {rid}: {r1.status_code} {r1.text}", flush=True)
     time.sleep(0.8)
 
-    button_payload = {
+    # FIXED: generic template works on IG, button template does not
+    payload = {
         "recipient": {"id": rid},
         "message": {
             "attachment": {
                 "type": "template",
                 "payload": {
-                    "template_type": "button",
-                    "text": FOLLOW_MESSAGE,
-                    "buttons": [
-                        {"type": "web_url", "url": APPLE_URL, "title": "【entity-Apple Podcasts¦canonical_name=Apple】"},
-                        {"type": "web_url", "url": SPOTIFY_URL, "title": "【entity-Spotify¦canonical_name=Spotify】"},
-                        {"type": "web_url", "url": YOUTUBE_MUSIC_URL, "title": "【entity-YouTube Music¦canonical_name=YouTube Music】"}
+                    "template_type": "generic",
+                    "elements": [
+                        {
+                            "title": "Parenting Pulse",
+                            "subtitle": FOLLOW_MESSAGE[:80],
+                            "buttons": [
+                                {"type": "web_url", "url": APPLE_URL, "title": "Apple Podcasts"},
+                                {"type": "web_url", "url": SPOTIFY_URL, "title": "【entity-Spotify¦canonical_name=Spotify】"},
+                                {"type": "web_url", "url": YOUTUBE_MUSIC_URL, "title": "【entity-YouTube Music¦canonical_name=YouTube Music】"}
+                            ]
+                        }
                     ]
                 }
             }
         }
     }
-    r2 = requests.post(url, headers=headers, json=button_payload, timeout=10)
+    r2 = requests.post(url, headers=headers, json=payload, timeout=10)
     print(f"BUTTONS to {rid}: {r2.status_code} {r2.text}", flush=True)
     return r2
 
