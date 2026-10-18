@@ -27,6 +27,7 @@ ENV_S = bytes([83,80,79,84,73,70,89,95,85,82,76]).decode()
 ENV_YT = bytes([89,79,85,84,85,66,69,95,77,85,83,73,67,95,85,82,76]).decode()
 
 FOLLOW_MESSAGE = get_env_ci("FOLLOW_MESSAGE", "Welcome! Enjoy our podcast! Happy Listening!")
+#UNFOLLOW_MESSAGE = get_env_ci("UNFOLLOW_MESSAGE", "Hey! I noticed you unfollowed, totally get it ❤ But if you prefer audio, here's our Parenting Pulse podcast you can binge anytime - perfect for walks, drives, or folding laundry - no endless scrolling needed! ❤")
 UNFOLLOW_MESSAGE = get_env_ci("UNFOLLOW_MESSAGE", "Hey! Thanks for being part of our Parenting Pulse community.  ❤ If you prefer audio, here's our Parenting Pulse podcast you can binge anytime - perfect for walks, drives, or folding laundry - no endless scrolling needed! ❤")
 DM_MESSAGE = get_env_ci("DM_MESSAGE", "Thanks for reaching out! ❤")
 WELCOME_MESSAGE = get_env_ci("WELCOME_MESSAGE", "Hey! Thanks for DMing ❤")
@@ -211,13 +212,12 @@ def check_followers_loop():
             if unfollowed:
                 print(f"UNFOLLOWED: {unfollowed}", flush=True)
                 stored["unfollowers"] = list(set(stored.get("unfollowers", [])) | unfollowed)
-                # Send enticing podcast link to unfollowers - NEW LOGIC, nothing removed
                 for fid in unfollowed:
                     try:
                         send_unfollow_podcast_menu(fid)
                         time.sleep(1)
                     except Exception as e:
-                        print(f"Failed to send unfollow DM to {fid}: {e}", flush=True)
+                        print(f"Failed unfollow DM to {fid}: {e}", flush=True)
             stored["followers"] = current
             stored["last_check"] = datetime.now().isoformat()
             save_followers(stored)
@@ -340,6 +340,56 @@ def debug_followers_live():
     stored = load_followers()
     return jsonify({"current_api_result": current, "stored": stored})
 
+@app.route('/debug-follow-trigger')
+def debug_follow_trigger():
+    to = request.args.get("to")
+    if not to:
+        return "Add ?to=IG_ID - like /debug-follow-trigger?to=YOUR_ID - This simulates the Follow to DM beta event"
+    r = send_podcast_menu(to)
+    return f"Simulated FOLLOW event - Sent podcast menu to {to}: {r.status_code if r else 'None'} {r.text[:500] if r else ''}"
+
+@app.route('/debug-subscribe-follows')
+def debug_subscribe_follows():
+    # Try to subscribe to follows field if your Page has beta
+    headers = {"Authorization": f"Bearer {IG_TOKEN}", "Content-Type": "application/json"}
+    results = ""
+    for field_list in ["follows,followers,comments,messages", "follows,messages,comments", "messages,comments,follows"]:
+        payload = {"subscribed_fields": field_list}
+        r = requests.post(f"https://graph.instagram.com/v25.0/me/subscribed_apps", headers=headers, json=payload, timeout=10)
+        results += f"Subscribing to {field_list}: {r.status_code} {r.text}<br><br>"
+    r2 = requests.get(f"https://graph.instagram.com/v25.0/me/subscribed_apps", headers=headers, timeout=10)
+    results += f"Current subs: {r2.text}"
+    return results, 200, {'Content-Type': 'text/html'}
+
+@app.route('/debug-send-unfollow-test')
+def debug_send_unfollow_test():
+    to = request.args.get("to")
+    if not to:
+        return "Add ?to=IG_ID - like /debug-send-unfollow-test?to=YOUR_IG_ID"
+    r = send_unfollow_podcast_menu(to)
+    return f"Sent unfollow menu to {to}: {r.status_code if r else 'None'} {r.text[:1000] if r else ''}"
+
+@app.route('/debug-manual-unfollow')
+def debug_manual_unfollow():
+    # Simulate an unfollow: remove an ID from stored list and trigger DM
+    fid = request.args.get("id")
+    if not fid:
+        return "Add ?id=IG_ID to simulate unfollow for that ID"
+    stored = load_followers()
+    old = set(stored.get("followers", []))
+    if fid in old:
+        new_list = [x for x in stored.get("followers", []) if x != fid]
+        stored["followers"] = new_list
+        stored["unfollowers"] = list(set(stored.get("unfollowers", [])) | {fid})
+        save_followers(stored)
+        # Now send the enticing DM
+        r = send_unfollow_podcast_menu(fid)
+        return f"Simulated unfollow for {fid}. Sent DM: {r.status_code if r else 'None'}<br>Stored now: {stored}"
+    else:
+        # If not in stored, just send DM anyway for testing
+        r = send_unfollow_podcast_menu(fid)
+        return f"ID {fid} was not in stored followers (stored has {len(stored.get('followers', []))} ids), but sent test DM anyway: {r.status_code if r else 'None'}" 
+
 @app.route('/posts')
 def list_posts():
     url = f"https://graph.instagram.com/v25.0/me/media?fields=id,caption,permalink&access_token={IG_TOKEN}"
@@ -357,26 +407,56 @@ def webhook():
     for entry in data.get("entry", []):
         entry_id = str(entry.get("id", ""))
         if entry_id == "0":
-            print(" Meta dashboard TEST event (id=0) - returning 200 OK without sending", flush=True)
+            print(" 【entity-Meta¦canonical_name=Meta】 dashboard TEST event (id=0) - returning 200 OK without sending", flush=True)
             continue
         
         for msg in entry.get("messaging", []):
+            # Check if this is a follow event via messaging (beta)
+            if msg.get("follow") or msg.get("follow_event") or "follow" in str(msg).lower():
+                fid = msg.get("sender", {}).get("id") or msg.get("from", {}).get("id") or msg.get("user", {}).get("id")
+                print(f"FOLLOW via messaging array: {msg} fid={fid}", flush=True)
+                if fid:
+                    try:
+                        send_podcast_menu(fid)
+                    except Exception as e:
+                        print(f"Follow via messaging error: {e}", flush=True)
+                    continue
+
             if msg.get("message", {}).get("is_echo"):
                 continue
             sender_id = msg.get("sender", {}).get("id")
             text = msg.get("message", {}).get("text", "")
             print(f"DM from {sender_id}: {text}", flush=True)
             if sender_id and text:
-                # --- TOGGLE FOR TESTING - COMMENT/UNCOMMENT TO SWITCH ---
-                # PROD MODE: Simple DM only - uncomment for production
-                 send_dm(sender_id, DM_MESSAGE)
-                
-                # TEST MODE: Welcome + buttons - current testing mode
-                #send_podcast_menu(sender_id)
+                # --- TOGGLE FOR TESTING ---
+                # PROD: 
+                send_dm(sender_id, DM_MESSAGE)
+                # TEST:
+               # send_podcast_menu(sender_id)
                 # --- END TOGGLE ---
 
         for change in entry.get("changes", []):
             field = change.get("field")
+            # NEW: Handle Follow to DM beta - ManyChat exclusive follow event
+            if field in ["follows", "follow", "followers", "follower"]:
+                val = change.get("value", {}) or {}
+                # Try multiple possible ID locations for follow event
+                fid = (
+                    val.get("follower_id") or 
+                    val.get("from", {}).get("id") or 
+                    val.get("user_id") or
+                    val.get("id") or
+                    val.get("sender", {}).get("id")
+                )
+                print(f"FOLLOW EVENT detected field={field} value={val} fid={fid}", flush=True)
+                if fid:
+                    try:
+                        # Enticing audio version for new followers
+                        send_podcast_menu(fid)
+                    except Exception as e:
+                        print(f"Follow DM error: {e}", flush=True)
+                continue
+
             if field not in ["comments", "feed", "messages"]:
                 continue
 
