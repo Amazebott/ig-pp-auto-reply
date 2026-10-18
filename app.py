@@ -33,6 +33,7 @@ COMMENT_MESSAGE = get_env_ci("COMMENT_MESSAGE", "Thanks so much! \u2764")
 COMMENT_DM_PROMPT = get_env_ci("COMMENT_DM_PROMPT", "Just sent you the link in DMs! \u2764")
 LINK_DM_TEMPLATE = get_env_ci("LINK_DM_TEMPLATE", "Here you go! {LINK}")
 POST_LINKS = json.loads(get_env_ci("POST_LINKS_JSON", '{"default": "https://your-link.com"}'))
+UNFOLLOW_MESSAGE = get_env_ci("UNFOLLOW_MESSAGE", "Hey!  💛 If you prefer audio, here's our Parenting Pulse podcast you can binge anytime - perfect for walks, drives, or folding laundry!")
 
 A_URL = get_env_ci("APPLE_URL", "https://podcasts.apple.com/")
 S_URL = get_env_ci(ENV_S, "https://open." + bytes([115,112,111,116,105,102,121]).decode() + ".com/")
