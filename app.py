@@ -27,13 +27,13 @@ ENV_S = bytes([83,80,79,84,73,70,89,95,85,82,76]).decode()
 ENV_YT = bytes([89,79,85,84,85,66,69,95,77,85,83,73,67,95,85,82,76]).decode()
 
 FOLLOW_MESSAGE = get_env_ci("FOLLOW_MESSAGE", "Welcome! Enjoy our podcast! Happy Listening!")
-DM_MESSAGE = get_env_ci("DM_MESSAGE", "Thanks for reaching out! \u2764")
-WELCOME_MESSAGE = get_env_ci("WELCOME_MESSAGE", "Hey! Thanks for DMing \u2764")
-COMMENT_MESSAGE = get_env_ci("COMMENT_MESSAGE", "Thanks so much! \u2764")
-COMMENT_DM_PROMPT = get_env_ci("COMMENT_DM_PROMPT", "Just sent you the link in DMs! \u2764")
+UNFOLLOW_MESSAGE = get_env_ci("UNFOLLOW_MESSAGE", "Hey! Thanks for being part of our Parenting Pulse community.  ❤ If you prefer audio, here's our Parenting Pulse podcast you can binge anytime - perfect for walks, drives, or folding laundry - no endless scrolling needed! ❤")
+DM_MESSAGE = get_env_ci("DM_MESSAGE", "Thanks for reaching out! ❤")
+WELCOME_MESSAGE = get_env_ci("WELCOME_MESSAGE", "Hey! Thanks for DMing ❤")
+COMMENT_MESSAGE = get_env_ci("COMMENT_MESSAGE", "Thanks so much! ❤")
+COMMENT_DM_PROMPT = get_env_ci("COMMENT_DM_PROMPT", "Just sent you the link in DMs! ❤")
 LINK_DM_TEMPLATE = get_env_ci("LINK_DM_TEMPLATE", "Here you go! {LINK}")
 POST_LINKS = json.loads(get_env_ci("POST_LINKS_JSON", '{"default": "https://your-link.com"}'))
-UNFOLLOW_MESSAGE = get_env_ci("UNFOLLOW_MESSAGE", "Hey!  💛 If you prefer audio, here's our Parenting Pulse podcast you can binge anytime - perfect for walks, drives, or folding laundry!")
 
 A_URL = get_env_ci("APPLE_URL", "https://podcasts.apple.com/")
 S_URL = get_env_ci(ENV_S, "https://open." + bytes([115,112,111,116,105,102,121]).decode() + ".com/")
@@ -117,6 +117,50 @@ def send_podcast_menu(recipient_id):
         print(f"BUTTONS EXCEPTION: {e}", flush=True)
         return None
 
+def send_unfollow_podcast_menu(recipient_id):
+    print(f"DEBUG UNFOLLOW MENU for {recipient_id}", flush=True)
+    if not recipient_id:
+        return None
+    rid = str(recipient_id).strip("{}'\" ")
+    if rid in ["0", "23245", "12334"]:
+        return None
+    url = f"https://graph.instagram.com/v25.0/me/messages"
+    headers = {"Authorization": f"Bearer {IG_TOKEN}", "Content-Type": "application/json"}
+    try:
+        r1 = requests.post(url, headers=headers, json={"recipient": {"id": rid}, "message": {"text": UNFOLLOW_MESSAGE}}, timeout=10)
+        print(f"UNFOLLOW TEXT to {rid}: {r1.status_code} {r1.text[:500]}", flush=True)
+    except Exception as e:
+        print(f"UNFOLLOW TEXT EXCEPTION: {e}", flush=True)
+        return None
+    time.sleep(0.8)
+    try:
+        payload = {
+            "recipient": {"id": rid},
+            "message": {
+                "attachment": {
+                    "type": "template",
+                    "payload": {
+                        "template_type": "generic",
+                        "elements": [{
+                            "title": "Parenting Pulse - Audio Version",
+                            "subtitle": "Listen anytime - no scrolling needed",
+                            "buttons": [
+                                {"type": "web_url", "url": A_URL, "title": A_NAME},
+                                {"type": "web_url", "url": S_URL, "title": S_NAME},
+                                {"type": "web_url", "url": YT_URL, "title": YT_NAME}
+                            ]
+                        }]
+                    }
+                }
+            }
+        }
+        r2 = requests.post(url, headers=headers, json=payload, timeout=10)
+        print(f"UNFOLLOW BUTTONS to {rid}: {r2.status_code} {r2.text[:500]}", flush=True)
+        return r2
+    except Exception as e:
+        print(f"UNFOLLOW BUTTONS EXCEPTION: {e}", flush=True)
+        return None
+
 def reply_to_comment(comment_id, text):
     url = f"https://graph.instagram.com/v25.0/{comment_id}/replies"
     headers = {"Authorization": f"Bearer {IG_TOKEN}", "Content-Type": "application/json"}
@@ -133,12 +177,13 @@ def fetch_current_followers():
     except Exception as e:
         print(f"Count error: {e}", flush=True)
     token_for_followers = PAGE_ACCESS_TOKEN or IG_TOKEN
+    print(f"Using token for followers edge: PAGE_TOKEN length {len(PAGE_ACCESS_TOKEN)} / IG_TOKEN length {len(IG_TOKEN)} -> using len {len(token_for_followers)}", flush=True)
     try:
         url = f"https://graph.facebook.com/v25.0/{IG_USER_ID}/followers"
         params = {"access_token": token_for_followers, "limit": 50}
         r = requests.get(url, params=params, timeout=15)
         if r.status_code != 200:
-            print(f"Followers edge not available: {r.text[:500]}", flush=True)
+            print(f"Followers edge not available on IGUser (expected #100): {r.text[:500]}", flush=True)
             return None
         data = r.json()
         return [str(f.get("id")) for f in data.get("data", [])]
@@ -154,15 +199,25 @@ def check_followers_loop():
             old_followers = set(stored.get("followers", []))
             current = fetch_current_followers()
             if current is None:
+                print("Followers edge not available - using DM history proxy", flush=True)
                 time.sleep(120)
                 continue
             new_followers = set(current) - old_followers
             unfollowed = old_followers - set(current)
             if new_followers:
+                print(f"NEW FOLLOWERS: {new_followers}", flush=True)
                 for fid in new_followers:
                     send_podcast_menu(fid)
             if unfollowed:
+                print(f"UNFOLLOWED: {unfollowed}", flush=True)
                 stored["unfollowers"] = list(set(stored.get("unfollowers", [])) | unfollowed)
+                # Send enticing podcast link to unfollowers - NEW LOGIC, nothing removed
+                for fid in unfollowed:
+                    try:
+                        send_unfollow_podcast_menu(fid)
+                        time.sleep(1)
+                    except Exception as e:
+                        print(f"Failed to send unfollow DM to {fid}: {e}", flush=True)
             stored["followers"] = current
             stored["last_check"] = datetime.now().isoformat()
             save_followers(stored)
@@ -247,11 +302,13 @@ def debug_fix_sub_live():
     results = ""
     payload_ig = {"subscribed_fields": "messages,messaging_seen,messaging_postbacks,comments"}
     r1 = requests.post(f"https://graph.instagram.com/v25.0/29124672473803420/subscribed_apps", headers=headers, json=payload_ig, timeout=10)
-    results += f"IG sub: {r1.status_code} {r1.text}<br><br>"
+    results += f"IG sub 29124...: {r1.status_code} {r1.text}<br><br>"
+    r2 = requests.post(f"https://graph.instagram.com/v25.0/17907894192554821/subscribed_apps", headers=headers, json=payload_ig, timeout=10)
+    results += f"Page sub 17907...: {r2.status_code} {r2.text}<br><br>"
     r3 = requests.get(f"https://graph.instagram.com/v25.0/me/subscribed_apps", headers={"Authorization": f"Bearer {IG_TOKEN}"}, timeout=10)
     results += f"CURRENT STATUS: {r3.text}"
     return results, 200, {'Content-Type': 'text/html'}
-
+    
 @app.route('/debug-status-live')
 def debug_status_live():
     headers = {"Authorization": f"Bearer {IG_TOKEN}"}
@@ -270,7 +327,7 @@ def debug_sub_live():
 def debug_send_test_live():
     to = request.args.get("to")
     if not to:
-        return "Add ?to=IG_ID"
+        return "Add ?to=IG_ID - like /debug-send-test-live?to=YOUR_ID"
     url = f"https://graph.instagram.com/v25.0/me/messages"
     headers = {"Authorization": f"Bearer {IG_TOKEN}", "Content-Type": "application/json"}
     payload = {"recipient": {"id": to}, "message": {"text": "Test DM from bot works!"}}
@@ -296,11 +353,13 @@ def webhook():
     print(f"Received webhook: {json.dumps(data)[:3000]}", flush=True)
     if not data:
         return "OK", 200
+    
     for entry in data.get("entry", []):
         entry_id = str(entry.get("id", ""))
         if entry_id == "0":
             print(" Meta dashboard TEST event (id=0) - returning 200 OK without sending", flush=True)
             continue
+        
         for msg in entry.get("messaging", []):
             if msg.get("message", {}).get("is_echo"):
                 continue
@@ -310,16 +369,17 @@ def webhook():
             if sender_id and text:
                 # --- TOGGLE FOR TESTING - COMMENT/UNCOMMENT TO SWITCH ---
                 # PROD MODE: Simple DM only - uncomment for production
-                 send_dm(sender_id, DM_MESSAGE)
+                # send_dm(sender_id, DM_MESSAGE)
                 
-                # TEST MODE: Welcome + buttons with hyperlinks - current testing mode
-                #send_podcast_menu(sender_id)
+                # TEST MODE: Welcome + buttons - current testing mode
+                send_podcast_menu(sender_id)
                 # --- END TOGGLE ---
 
         for change in entry.get("changes", []):
             field = change.get("field")
             if field not in ["comments", "feed", "messages"]:
                 continue
+
             if field == "messages":
                 val = change.get("value", {})
                 sender_obj = val.get("sender", {})
@@ -332,12 +392,14 @@ def webhook():
                     clean_id = str(sender_id).strip("{}'\" ")
                     send_dm(clean_id, DM_MESSAGE)
                 continue
+
             val = change.get("value", {})
             media_id = str(val.get("media_id") or val.get("post_id") or "")
             comment_text = val.get("text", "").lower()
             comment_id = val.get("comment_id") or val.get("id")
             from_id = val.get("from", {}).get("id")
             print(f"Comment '{comment_text}' on {media_id}", flush=True)
+            
             if "link" in comment_text and comment_id:
                 link_to_send = POST_LINKS.get(media_id) or POST_LINKS.get("default")
                 reply_to_comment(comment_id, COMMENT_DM_PROMPT)
@@ -345,7 +407,8 @@ def webhook():
                     send_dm(from_id, LINK_DM_TEMPLATE.replace("{LINK}", link_to_send))
             elif comment_id and val.get("verb") == "add":
                 reply_to_comment(comment_id, COMMENT_MESSAGE)
-    return "OK", 200
 
+    return "OK", 200
+    
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=10000)
