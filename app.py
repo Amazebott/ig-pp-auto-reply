@@ -68,6 +68,7 @@ def send_dm(recipient_id, text):
     return r
 
 def send_podcast_menu(recipient_id):
+    # FOLLOW FLOW - sends WELCOME + FOLLOW + 3 links
     if not recipient_id:
         return None
     rid = str(recipient_id).strip("{}'\" ")
@@ -76,56 +77,20 @@ def send_podcast_menu(recipient_id):
     url = f"https://graph.instagram.com/v25.0/me/messages"
     headers = {"Authorization": f"Bearer {IG_TOKEN}", "Content-Type": "application/json"}
     
+    r1 = requests.post(url, headers=headers, json={"recipient": {"id": rid}, "message": {"text": WELCOME_MESSAGE}}, timeout=10)
+    print(f"WELCOME to {rid}: {r1.status_code} {r1.text}", flush=True)
     time.sleep(1)
-    # Follow text
-    r1 = requests.post(url, headers=headers, json={"recipient": {"id": rid}, "message": {"text": FOLLOW_MESSAGE}}, timeout=15)
-    print(f"Follow msg to {rid}: {r1.status_code} {r1.text}", flush=True)
+
+    r2 = requests.post(url, headers=headers, json={"recipient": {"id": rid}, "message": {"text": FOLLOW_MESSAGE}}, timeout=10)
+    print(f"FOLLOW to {rid}: {r2.status_code} {r2.text}", flush=True)
     time.sleep(0.8)
 
-    # Button 1 - 【entity-Apple¦canonical_name=Apple】
-    btn_apple = {
-        "attachment": {
-            "type": "template",
-            "payload": {
-                "template_type": "button",
-                "text": "🎧 Listen on 【entity-Apple¦canonical_name=Apple】 Podcasts",
-                "buttons": [{"type": "web_url", "url": APPLE_URL, "title": "【entity-Apple¦canonical_name=Apple】"}]
-            }
-        }
-    }
-    r2 = requests.post(url, headers=headers, json={"recipient": {"id": rid}, "message": btn_apple}, timeout=10)
-    print(f"【entity-Apple¦canonical_name=Apple】 btn to {rid}: {r2.status_code} {r2.text}", flush=True)
-    time.sleep(0.8)
-
-    # Button 2 - 【entity-Spotify¦canonical_name=Spotify】
-    btn_spotify = {
-        "attachment": {
-            "type": "template",
-            "payload": {
-                "template_type": "button",
-                "text": "🎧 Listen on 【entity-Spotify¦canonical_name=Spotify】",
-                "buttons": [{"type": "web_url", "url": SPOTIFY_URL, "title": "【entity-Spotify¦canonical_name=Spotify】"}]
-            }
-        }
-    }
-    r3 = requests.post(url, headers=headers, json={"recipient": {"id": rid}, "message": btn_spotify}, timeout=10)
-    print(f"【entity-Spotify¦canonical_name=Spotify】 btn to {rid}: {r3.status_code} {r3.text}", flush=True)
-    time.sleep(0.8)
-
-    # Button 3 - YouTube
-    btn_yt = {
-        "attachment": {
-            "type": "template",
-            "payload": {
-                "template_type": "button",
-                "text": "🎧 Listen on YouTube Music",
-                "buttons": [{"type": "web_url", "url": YOUTUBE_MUSIC_URL, "title": "YouTube"}]
-            }
-        }
-    }
-    r4 = requests.post(url, headers=headers, json={"recipient": {"id": rid}, "message": btn_yt}, timeout=10)
-    print(f"YouTube btn to {rid}: {r4.status_code} {r4.text}", flush=True)
-    return r4
+    r3 = requests.post(url, headers=headers, json={"recipient": {"id": rid}, "message": {"text": f"Apple Podcasts:\n{APPLE_URL}"}}, timeout=10)
+    time.sleep(0.5)
+    r4 = requests.post(url, headers=headers, json={"recipient": {"id": rid}, "message": {"text": f"Spotify:\n{SPOTIFY_URL}"}}, timeout=10)
+    time.sleep(0.5)
+    r5 = requests.post(url, headers=headers, json={"recipient": {"id": rid}, "message": {"text": f"YouTube Music:\n{YOUTUBE_MUSIC_URL}"}}, timeout=10)
+    return r5
 
 
 def reply_to_comment(comment_id, text):
@@ -331,11 +296,14 @@ def webhook():
     print(f"Received webhook: {json.dumps(data)[:3000]}", flush=True)
     if not data:
         return "OK", 200
+    
     for entry in data.get("entry", []):
         entry_id = str(entry.get("id", ""))
         if entry_id == "0":
-            print("✅ Meta dashboard TEST event (id=0) - returning 200 OK without sending", flush=True)
+            print("✅ 【entity-Meta¦canonical_name=Meta】 dashboard TEST event (id=0) - returning 200 OK without sending", flush=True)
             continue
+        
+        # --- 1. MESSAGING (DMs) -> ONLY DM_MESSAGE ---
         for msg in entry.get("messaging", []):
             if msg.get("message", {}).get("is_echo"):
                 continue
@@ -343,13 +311,15 @@ def webhook():
             text = msg.get("message", {}).get("text", "")
             print(f"DM from {sender_id}: {text}", flush=True)
             if sender_id and text:
-                send_dm(sender_id, WELCOME_MESSAGE)
-                time.sleep(1.5)
-                send_podcast_menu(sender_id)
+                send_dm(sender_id, DM_MESSAGE)
+
+        # --- 2. CHANGES (comments + messages via changes) ---
         for change in entry.get("changes", []):
             field = change.get("field")
             if field not in ["comments", "feed", "messages"]:
                 continue
+
+            # DM via changes object -> ONLY DM_MESSAGE
             if field == "messages":
                 val = change.get("value", {})
                 sender_obj = val.get("sender", {})
@@ -357,19 +327,20 @@ def webhook():
                     sender_id = sender_obj.get("id") or next(iter(sender_obj.keys()), None)
                 else:
                     sender_id = sender_obj
-                print(f"DM (via changes) from {sender_id} - treating as FIRST DM", flush=True)
+                print(f"DM (via changes) from {sender_id} - DM only", flush=True)
                 if sender_id:
                     clean_id = str(sender_id).strip("{}'\" ")
-                    send_dm(clean_id, WELCOME_MESSAGE)
-                    time.sleep(1.5)
-                    send_podcast_menu(clean_id)
+                    send_dm(clean_id, DM_MESSAGE)
                 continue
+
+            # Comments flow -> keep your original link logic
             val = change.get("value", {})
             media_id = str(val.get("media_id") or val.get("post_id") or "")
             comment_text = val.get("text", "").lower()
             comment_id = val.get("comment_id") or val.get("id")
             from_id = val.get("from", {}).get("id")
             print(f"Comment '{comment_text}' on {media_id}", flush=True)
+            
             if "link" in comment_text and comment_id:
                 link_to_send = POST_LINKS.get(media_id) or POST_LINKS.get("default")
                 reply_to_comment(comment_id, COMMENT_DM_PROMPT)
@@ -377,6 +348,7 @@ def webhook():
                     send_dm(from_id, LINK_DM_TEMPLATE.replace("{LINK}", link_to_send))
             elif comment_id and val.get("verb") == "add":
                 reply_to_comment(comment_id, COMMENT_MESSAGE)
+
     return "OK", 200
     
 if __name__ == "__main__":
