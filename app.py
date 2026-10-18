@@ -20,7 +20,7 @@ def get_env_ci(name, default):
             return v
     return default
 
-FOLLOW_MESSAGE = get_env_ci("FOLLOW_MESSAGE", "Welcome! Enjoy our podcast on Apple, 【entity-Spotify¦canonical_name=Spotify】, and 【entity-YouTube Music¦canonical_name=YouTube Music】! Happy Listening!")
+FOLLOW_MESSAGE = get_env_ci("FOLLOW_MESSAGE", "Welcome! Enjoy our podcast on 【entity-Apple¦canonical_name=Apple】, 【entity-Spotify¦canonical_name=Spotify】, and 【entity-YouTube Music¦canonical_name=YouTube Music】! Happy Listening!")
 DM_MESSAGE = get_env_ci("DM_MESSAGE", "Thanks for reaching out! 💛")
 APPLE_URL = get_env_ci("APPLE_URL", "https://podcasts.apple.com/")
 SPOTIFY_URL = get_env_ci("SPOTIFY_URL", "https://open.spotify.com/")
@@ -85,7 +85,7 @@ def send_podcast_menu(recipient_id):
     print(f"FOLLOW to {rid}: {r2.status_code} {r2.text}", flush=True)
     time.sleep(0.8)
 
-    r3 = requests.post(url, headers=headers, json={"recipient": {"id": rid}, "message": {"text": f"Apple Podcasts:\n{APPLE_URL}"}}, timeout=10)
+    r3 = requests.post(url, headers=headers, json={"recipient": {"id": rid}, "message": {"text": f"【entity-Apple Podcasts¦canonical_name=Apple】:\n{APPLE_URL}"}}, timeout=10)
     time.sleep(0.5)
     r4 = requests.post(url, headers=headers, json={"recipient": {"id": rid}, "message": {"text": f"【entity-Spotify¦canonical_name=Spotify】:\n{SPOTIFY_URL}"}}, timeout=10)
     time.sleep(0.5)
@@ -158,7 +158,7 @@ def privacy():
     <html><head><title>Privacy Policy</title></head><body>
     <h1>Privacy Policy - Parenting Pulse</h1>
     <p>Effective Date: 2026</p>
-    <p>We use Instagram permissions instagram_manage_comments and instagram_business_manage_messages solely to auto-reply to comments containing the keyword 'link' and send the requested link via DM.</p>
+    <p>We use 【entity-Instagram¦canonical_name=Instagram】 permissions instagram_manage_comments and instagram_business_manage_messages solely to auto-reply to comments containing the keyword 'link' and send the requested link via DM.</p>
     <p>We do not store, share, or sell personal data. Data is processed transiently to fulfill the DM request.</p>
     <p>To request deletion: email amazebot@outlook.com and we will delete any stored comment IDs within 48 hours.</p>
     <p>Contact: amazebot@outlook.com</p>
@@ -299,10 +299,10 @@ def webhook():
     for entry in data.get("entry", []):
         entry_id = str(entry.get("id", ""))
         if entry_id == "0":
-            print("【entity-Meta¦canonical_name=Meta】 dashboard TEST event (id=0) - returning 200 OK without sending", flush=True)
+            print("Meta dashboard TEST event (id=0) - returning 200 OK without sending", flush=True)
             continue
         
-        # --- 1. MESSAGING (DMs) -> ONLY DM_MESSAGE ---
+        # --- 1. MESSAGING (DMs) -> TESTING MENU ---
         for msg in entry.get("messaging", []):
             if msg.get("message", {}).get("is_echo"):
                 continue
@@ -310,11 +310,9 @@ def webhook():
             text = msg.get("message", {}).get("text", "")
             print(f"DM from {sender_id}: {text}", flush=True)
             if sender_id and text:
-                 #==> dM
+                 #==> DM TEST
                 #send_dm(sender_id, DM_MESSAGE)
                 send_podcast_menu(sender_id)
-
-       
 
         # --- 2. CHANGES (comments + messages via changes) ---
         for change in entry.get("changes", []):
