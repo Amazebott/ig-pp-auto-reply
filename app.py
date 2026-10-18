@@ -309,10 +309,10 @@ def webhook():
             if sender_id and text:
                 # --- TOGGLE FOR TESTING - COMMENT/UNCOMMENT TO SWITCH ---
                 # PROD MODE: Simple DM only - uncomment for production
-                # send_dm(sender_id, DM_MESSAGE)
+                 send_dm(sender_id, DM_MESSAGE)
                 
                 # TEST MODE: Welcome + buttons with hyperlinks - current testing mode
-                send_podcast_menu(sender_id)
+                #send_podcast_menu(sender_id)
                 # --- END TOGGLE ---
 
         for change in entry.get("changes", []):
