@@ -310,7 +310,11 @@ def webhook():
             text = msg.get("message", {}).get("text", "")
             print(f"DM from {sender_id}: {text}", flush=True)
             if sender_id and text:
-                send_dm(sender_id, DM_MESSAGE)
+                 #==> dM
+                #send_dm(sender_id, DM_MESSAGE)
+                send_podcast_menu(sender_id)
+
+       
 
         # --- 2. CHANGES (comments + messages via changes) ---
         for change in entry.get("changes", []):
