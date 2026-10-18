@@ -20,7 +20,7 @@ def get_env_ci(name, default):
             return v
     return default
 
-FOLLOW_MESSAGE = get_env_ci("FOLLOW_MESSAGE", "Welcome! 🎙 Enjoy our podcast on 【entity-Apple¦canonical_name=Apple】, Spotify, and YouTube Music! 🎧😊 Happy Listening!")
+FOLLOW_MESSAGE = get_env_ci("FOLLOW_MESSAGE", "Welcome! Enjoy our podcast on 【entity-Apple¦canonical_name=Apple】, 【entity-Spotify¦canonical_name=Spotify】, and YouTube Music! Happy Listening!")
 DM_MESSAGE = get_env_ci("DM_MESSAGE", "Thanks for reaching out! 💛")
 APPLE_URL = get_env_ci("APPLE_URL", "https://podcasts.apple.com/")
 SPOTIFY_URL = get_env_ci("SPOTIFY_URL", "https://open.spotify.com/")
@@ -68,7 +68,7 @@ def send_dm(recipient_id, text):
     return r
 
 def send_podcast_menu(recipient_id):
-    # FOLLOW FLOW - sends WELCOME + FOLLOW + 3 links
+    # FOLLOW FLOW - sends WELCOME + FOLLOW + 3 links (tiny, no carousel)
     if not recipient_id:
         return None
     rid = str(recipient_id).strip("{}'\" ")
@@ -91,7 +91,6 @@ def send_podcast_menu(recipient_id):
     time.sleep(0.5)
     r5 = requests.post(url, headers=headers, json={"recipient": {"id": rid}, "message": {"text": f"YouTube Music:\n{YOUTUBE_MUSIC_URL}"}}, timeout=10)
     return r5
-
 
 def reply_to_comment(comment_id, text):
     url = f"https://graph.instagram.com/v25.0/{comment_id}/replies"
@@ -204,41 +203,6 @@ def debug_env():
         "VERIFY_TOKEN": VERIFY_TOKEN
     })
 
-# --- DEBUG CODE KEPT BUT COMMENTED OUT ---
-# @app.route('/debug-subscription')
-# def debug_sub():
-#     TOKEN = os.environ.get('IG_ACCESS_TOKEN')
-#     headers = {"Authorization": f"Bearer {TOKEN}", "Content-Type": "application/json"}
-#     payload = {"subscribed_fields": "messages,messaging_seen,messaging_postbacks,messaging_referral"}
-#     r = requests.post(f"https://graph.instagram.com/v25.0/me/subscribed_apps", headers=headers, json=payload)
-#     return r.text
-#
-# @app.route('/debug-status')
-# def debug_status():
-#     TOKEN = os.environ.get('IG_ACCESS_TOKEN')
-#     headers = {"Authorization": f"Bearer {TOKEN}"}
-#     r = requests.get(f"https://graph.instagram.com/v25.0/me/subscribed_apps", headers=headers)
-#     r2 = requests.get(f"https://graph.instagram.com/v25.0/me?fields=id,username", headers=headers)
-#     return f"SUBSCRIBED: {r.text}<br><br>ME IS: {r2.text}"
-#
-# # --- ADDITIONAL DEBUG HELPERS (kept commented) ---
-# @app.route('/debug-token')
-# def debug_token():
-#     TOKEN = os.environ.get('IG_ACCESS_TOKEN')
-#     r = requests.get(f"https://graph.instagram.com/v25.0/me?fields=id,username", headers={"Authorization": f"Bearer {TOKEN}"})
-#     return f"Token check: {r.status_code} {r.text}"
-#
-# @app.route('/debug-send-test')
-# def debug_send_test():
-#     to = request.args.get("to")
-#     TOKEN = os.environ.get('IG_ACCESS_TOKEN')
-#     url = f"https://graph.instagram.com/v25.0/me/messages"
-#     headers = {"Authorization": f"Bearer {TOKEN}", "Content-Type": "application/json"}
-#     payload = {"recipient": {"id": to}, "message": {"text": "Test from debug-send-test 💛"}}
-#     r = requests.post(url, headers=headers, json=payload)
-#     return f"{r.status_code} {r.text}"
-# --- END DEBUG CODE ---
-
 @app.route('/debug-fix-sub-live')
 def debug_fix_sub_live():
     headers = {"Authorization": f"Bearer {IG_TOKEN}", "Content-Type": "application/json"}
@@ -273,7 +237,7 @@ def debug_send_test_live():
         return "Add ?to=IG_ID - like /debug-send-test-live?to=YOUR_ID"
     url = f"https://graph.instagram.com/v25.0/me/messages"
     headers = {"Authorization": f"Bearer {IG_TOKEN}", "Content-Type": "application/json"}
-    payload = {"recipient": {"id": to}, "message": {"text": "Test DM from bot 💛 works!"}}
+    payload = {"recipient": {"id": to}, "message": {"text": "Test DM from bot works!"}}
     r = requests.post(url, headers=headers, json=payload, timeout=10)
     return f"{r.status_code} {r.text}"
 
@@ -300,7 +264,7 @@ def webhook():
     for entry in data.get("entry", []):
         entry_id = str(entry.get("id", ""))
         if entry_id == "0":
-            print("✅ 【entity-Meta¦canonical_name=Meta】 dashboard TEST event (id=0) - returning 200 OK without sending", flush=True)
+            print("Meta dashboard TEST event (id=0) - returning 200 OK without sending", flush=True)
             continue
         
         # --- 1. MESSAGING (DMs) -> ONLY DM_MESSAGE ---
@@ -319,7 +283,6 @@ def webhook():
             if field not in ["comments", "feed", "messages"]:
                 continue
 
-            # DM via changes object -> ONLY DM_MESSAGE
             if field == "messages":
                 val = change.get("value", {})
                 sender_obj = val.get("sender", {})
@@ -333,7 +296,6 @@ def webhook():
                     send_dm(clean_id, DM_MESSAGE)
                 continue
 
-            # Comments flow -> keep your original link logic
             val = change.get("value", {})
             media_id = str(val.get("media_id") or val.get("post_id") or "")
             comment_text = val.get("text", "").lower()
