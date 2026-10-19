@@ -170,21 +170,30 @@ def reply_to_comment(comment_id, text):
     return r
 
 def fetch_current_followers():
+    # FIX for expired PAGE_TOKEN (code 190) - don't spam logs, just skip as edge is blocked by 【entity-Meta¦canonical_name=Meta】 anyway
     try:
         url = f"https://graph.instagram.com/v25.0/{IG_USER_ID}"
         params = {"fields": "followers_count", "access_token": IG_TOKEN}
         r = requests.get(url, params=params, timeout=10)
         print(f"Followers count check: {r.text[:500]}", flush=True)
+        if "190" in r.text:
+            print("IG_TOKEN expired check - refresh IG_ACCESS_TOKEN if needed", flush=True)
     except Exception as e:
         print(f"Count error: {e}", flush=True)
-    token_for_followers = PAGE_ACCESS_TOKEN or IG_TOKEN
-    print(f"Using token for followers edge: PAGE_TOKEN length {len(PAGE_ACCESS_TOKEN)} / IG_TOKEN length {len(IG_TOKEN)} -> using len {len(token_for_followers)}", flush=True)
+    # Use IG_TOKEN only to avoid expired PAGE_TOKEN spam - PAGE_TOKEN optional now
+    token_for_followers = IG_TOKEN
+    if PAGE_ACCESS_TOKEN and len(PAGE_ACCESS_TOKEN) > 20:
+        token_for_followers = PAGE_ACCESS_TOKEN
+    print(f"Using token for followers edge: IG_TOKEN length {len(IG_TOKEN)} / PAGE_TOKEN length {len(PAGE_ACCESS_TOKEN)} -> using len {len(token_for_followers)} (PAGE optional, no long-lived needed)", flush=True)
     try:
         url = f"https://graph.facebook.com/v25.0/{IG_USER_ID}/followers"
         params = {"access_token": token_for_followers, "limit": 50}
         r = requests.get(url, params=params, timeout=15)
         if r.status_code != 200:
-            print(f"Followers edge not available on IGUser (expected #100): {r.text[:500]}", flush=True)
+            if "190" in r.text or "463" in r.text:
+                print("Followers edge: token expired (190/463) - skipping, no long-lived needed - edge blocked by Meta anyway", flush=True)
+            else:
+                print(f"Followers edge not available on IGUser (expected #100): {r.text[:500]}", flush=True)
             return None
         data = r.json()
         return [str(f.get("id")) for f in data.get("data", [])]
@@ -200,7 +209,7 @@ def check_followers_loop():
             old_followers = set(stored.get("followers", []))
             current = fetch_current_followers()
             if current is None:
-                print("Followers edge not available - using DM history proxy", flush=True)
+                print("Followers edge not available - using DM history proxy (no PAGE_TOKEN needed)", flush=True)
                 time.sleep(120)
                 continue
             new_followers = set(current) - old_followers
@@ -407,7 +416,7 @@ def webhook():
     for entry in data.get("entry", []):
         entry_id = str(entry.get("id", ""))
         if entry_id == "0":
-            print(" 【entity-Meta¦canonical_name=Meta】 dashboard TEST event (id=0) - returning 200 OK without sending", flush=True)
+            print(" Meta dashboard TEST event (id=0) - returning 200 OK without sending", flush=True)
             continue
         
         for msg in entry.get("messaging", []):
