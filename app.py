@@ -170,7 +170,7 @@ def reply_to_comment(comment_id, text):
     return r
 
 def fetch_current_followers():
-    # FIX for expired PAGE_TOKEN (code 190) - don't spam logs, just skip as edge is blocked by 【entity-Meta¦canonical_name=Meta】 anyway
+    # FIX for expired PAGE_TOKEN (code 190) - don't spam logs, just skip as edge is blocked by Meta anyway
     try:
         url = f"https://graph.instagram.com/v25.0/{IG_USER_ID}"
         params = {"fields": "followers_count", "access_token": IG_TOKEN}
@@ -421,7 +421,7 @@ def webhook():
         
         for msg in entry.get("messaging", []):
             # Check if this is a follow event via messaging (beta)
-            if msg.get("follow") or msg.get("follow_event") or "follow" in str(msg).lower():
+            if msg.get("follow") or msg.get("follow_event"):
                 fid = msg.get("sender", {}).get("id") or msg.get("from", {}).get("id") or msg.get("user", {}).get("id")
                 print(f"FOLLOW via messaging array: {msg} fid={fid}", flush=True)
                 if fid:
@@ -429,7 +429,7 @@ def webhook():
                         send_podcast_menu(fid)
                     except Exception as e:
                         print(f"Follow via messaging error: {e}", flush=True)
-                    continue
+                continue
 
             if msg.get("message", {}).get("is_echo"):
                 continue
@@ -446,21 +446,13 @@ def webhook():
 
         for change in entry.get("changes", []):
             field = change.get("field")
-            # NEW: Handle Follow to DM beta - ManyChat exclusive follow event
+            # === FOLLOW AUTOMESSAGE - FIXED INDENTATION ===
             if field in ["follows", "follow", "followers", "follower"]:
                 val = change.get("value", {}) or {}
-                # Try multiple possible ID locations for follow event
-                fid = (
-                    val.get("follower_id") or 
-                    val.get("from", {}).get("id") or 
-                    val.get("user_id") or
-                    val.get("id") or
-                    val.get("sender", {}).get("id")
-                )
-                print(f"FOLLOW EVENT detected field={field} value={val} fid={fid}", flush=True)
+                fid = val.get("follower_id") or val.get("from", {}).get("id") or val.get("user_id") or val.get("id")
+                print(f"FOLLOW EVENT field={field} fid={fid}", flush=True)
                 if fid:
                     try:
-                        # Enticing audio version for new followers
                         send_podcast_menu(fid)
                     except Exception as e:
                         print(f"Follow DM error: {e}", flush=True)
