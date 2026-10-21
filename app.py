@@ -180,11 +180,13 @@ def fetch_current_followers():
             print("IG_TOKEN expired check - refresh IG_ACCESS_TOKEN if needed", flush=True)
     except Exception as e:
         print(f"Count error: {e}", flush=True)
+        #---------------------------------
     # Use IG_TOKEN only to avoid expired PAGE_TOKEN spam - PAGE_TOKEN optional now
     token_for_followers = IG_TOKEN
-    if PAGE_ACCESS_TOKEN and len(PAGE_ACCESS_TOKEN) > 20:
-        token_for_followers = PAGE_ACCESS_TOKEN
-    print(f"Using token for followers edge: IG_TOKEN length {len(IG_TOKEN)} / PAGE_TOKEN length {len(PAGE_ACCESS_TOKEN)} -> using len {len(token_for_followers)} (PAGE optional, no long-lived needed)", flush=True)
+    #if PAGE_ACCESS_TOKEN and len(PAGE_ACCESS_TOKEN) > 20:
+    #    token_for_followers = PAGE_ACCESS_TOKEN
+    #print(f"Using token for followers edge: IG_TOKEN length {len(IG_TOKEN)} / PAGE_TOKEN length {len(PAGE_ACCESS_TOKEN)} -> using len {len(token_for_followers)} (PAGE optional, no long-lived needed)", flush=True)
+    print(f"Using IG_TOKEN only for followers edge: len {len(token_for_followers)}", flush=True)
     try:
         url = f"https://graph.facebook.com/v25.0/{IG_USER_ID}/followers"
         params = {"access_token": token_for_followers, "limit": 50}
