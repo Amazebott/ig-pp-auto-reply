@@ -356,6 +356,21 @@ def debug_follow_trigger():
         return "Add ?to=IG_ID - like /debug-follow-trigger?to=YOUR_ID - This simulates the Follow to DM beta event"
     r = send_podcast_menu(to)
     return f"Simulated FOLLOW event - Sent podcast menu to {to}: {r.status_code if r else 'None'} {r.text[:500] if r else ''}"
+    
+@app.route('/debug-subscribe-follow')
+def debug_subscribe_follow():
+    # CORRECT: Meta allows 'follow' singular, NOT 'follows' plural - fixes your screenshot 400 error
+    headers = {"Authorization": f"Bearer {IG_TOKEN}", "Content-Type": "application/json"}
+    results = ""
+    for field_list in ["follow,messages,comments", "follow,messaging_postbacks,comments,messages", "follow"]:
+        payload = {"subscribed_fields": field_list}
+        r = requests.post(f"https://graph.instagram.com/v25.0/me/subscribed_apps", headers=headers, json=payload, timeout=10)
+        results += f"Trying {field_list}: {r.status_code} {r.text}<br><br>"
+    r2 = requests.get(f"https://graph.instagram.com/v25.0/me/subscribed_apps", headers=headers, timeout=10)
+    results += f"Current subs: {r2.text}"
+    return results, 200, {'Content-Type': 'text/html'}
+
+@app.route('/debug-subscribe-follows')
 
 @app.route('/debug-subscribe-follows')
 def debug_subscribe_follows():
