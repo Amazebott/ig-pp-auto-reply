@@ -502,8 +502,7 @@ def webhook():
 
             if field not in ["comments", "feed", "messages", "mentions", "story_insights"]:
      
-
-            if field not in ["comments", "feed", "messages"]:
+          #  if field not in ["comments", "feed", "messages"]:
                 continue
 
             if field == "messages":
