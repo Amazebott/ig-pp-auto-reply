@@ -33,6 +33,7 @@ DM_MESSAGE = get_env_ci("DM_MESSAGE", "Thanks for reaching out! ❤")
 WELCOME_MESSAGE = get_env_ci("WELCOME_MESSAGE", "Hey! Thanks for DMing ❤")
 COMMENT_MESSAGE = get_env_ci("COMMENT_MESSAGE", "Thanks so much! ❤")
 COMMENT_DM_PROMPT = get_env_ci("COMMENT_DM_PROMPT", "Just sent you the link in DMs! ❤")
+MENTION_MESSAGE = get_env_ci("MENTION_MESSAGE", "OMG thank you for the mention! ❤️ So grateful!")
 LINK_DM_TEMPLATE = get_env_ci("LINK_DM_TEMPLATE", "Here you go! {LINK}")
 POST_LINKS = json.loads(get_env_ci("POST_LINKS_JSON", '{"default": "https://your-link.com"}'))
 
@@ -416,6 +417,18 @@ def debug_manual_unfollow():
         r = send_unfollow_podcast_menu(fid)
         return f"ID {fid} was not in stored followers (stored has {len(stored.get('followers', []))} ids), but sent test DM anyway: {r.status_code if r else 'None'}" 
 
+@app.route('/debug-subscribe-mentions')
+def debug_subscribe_mentions():
+    headers = {"Authorization": f"Bearer {IG_TOKEN}", "Content-Type": "application/json"}
+    results = ""
+    for field_list in ["mentions,comments,messages", "mentions,messages,story_insights,comments", "mentions"]:
+        payload = {"subscribed_fields": field_list}
+        r = requests.post(f"https://graph.instagram.com/v25.0/me/subscribed_apps", headers=headers, json=payload, timeout=10)
+        results += f"Trying {field_list}: {r.status_code} {r.text}<br><br>"
+    r2 = requests.get(f"https://graph.instagram.com/v25.0/me/subscribed_apps", headers=headers, timeout=10)
+    results += f"Current subs: {r2.text}"
+    return results, 200, {'Content-Type': 'text/html'}
+
 @app.route('/posts')
 def list_posts():
     url = f"https://graph.instagram.com/v25.0/me/media?fields=id,caption,permalink&access_token={IG_TOKEN}"
@@ -453,27 +466,42 @@ def webhook():
             sender_id = msg.get("sender", {}).get("id")
             text = msg.get("message", {}).get("text", "")
             print(f"DM from {sender_id}: {text}", flush=True)
+            
             if sender_id and text:
                 # --- TOGGLE FOR TESTING ---
                 # PROD: 
-                send_dm(sender_id, DM_MESSAGE)
+                low = text.lower()
+                is_story = msg.get("message", {}).get("reply_to", {}).get("story_id") is not None
+                if "welcome" in low or is_story:
+                    send_podcast_menu(sender_id)
+                else:
+                    send_dm(sender_id, DM_MESSAGE)
                 # TEST:
-               # send_podcast_menu(sender_id)
+                # send_podcast_menu(sender_id)
                 # --- END TOGGLE ---
-
+        
         for change in entry.get("changes", []):
             field = change.get("field")
-            # === FOLLOW AUTOMESSAGE - FIXED INDENTATION ===
-            if field in ["follows", "follow", "followers", "follower"]:
+            print(f"CHANGE field={field} value={change.get('value')}", flush=True)
+
+            # === MENTION WEBHOOK - NEW ===
+            if field == "mentions":
                 val = change.get("value", {}) or {}
-                fid = val.get("follower_id") or val.get("from", {}).get("id") or val.get("user_id") or val.get("id")
-                print(f"FOLLOW EVENT field={field} fid={fid}", flush=True)
-                if fid:
+                comment_id = val.get("comment_id")
+                if comment_id:
                     try:
-                        send_podcast_menu(fid)
+                        reply_to_comment(comment_id, MENTION_MESSAGE)
+                        from_id = val.get("from", {}).get("id")
+                        if from_id:
+                            send_dm(from_id, MENTION_MESSAGE)
+                            time.sleep(0.5)
+                            send_podcast_menu(from_id)
                     except Exception as e:
-                        print(f"Follow DM error: {e}", flush=True)
+                        print(f"Mention error: {e}", flush=True)
                 continue
+
+            if field not in ["comments", "feed", "messages", "mentions", "story_insights"]:
+     
 
             if field not in ["comments", "feed", "messages"]:
                 continue
