@@ -282,8 +282,8 @@ def debug_test_mention():
         return "Add ?user_id=xxx  — get your ID from /debug-whoami or logs", 400
     try:
         send_dm(user_id, MENTION_MESSAGE)
-        time.sleep(0.5)
-        send_podcast_menu(user_id)
+       # time.sleep(0.5)
+       # send_podcast_menu(user_id)
         return f"Sent MENTION_MESSAGE + menu to {user_id} — check your IG DMs", 200
     except Exception as e:
         return f"Error: {e}", 500
