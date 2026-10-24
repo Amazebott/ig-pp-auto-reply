@@ -273,6 +273,21 @@ def reset_followers():
 def debug_env():
     return jsonify({"FOLLOW_MESSAGE": FOLLOW_MESSAGE[:500], "IG_TOKEN_len": len(IG_TOKEN)})
 
+
+@app.route('/debug-test-mention')
+def debug_test_mention():
+    # usage: /debug-test-mention?user_id=YOUR_INSTAGRAM_USER_ID
+    user_id = request.args.get('user_id') or request.args.get('from_id')
+    if not user_id:
+        return "Add ?user_id=xxx  — get your ID from /debug-whoami or logs", 400
+    try:
+        send_dm(user_id, MENTION_MESSAGE)
+        time.sleep(0.5)
+        send_podcast_menu(user_id)
+        return f"Sent MENTION_MESSAGE + menu to {user_id} — check your IG DMs", 200
+    except Exception as e:
+        return f"Error: {e}", 500
+
 # --- DEBUG CODE KEPT BUT COMMENTED OUT ---
 # @app.route('/debug-subscription')
 # def debug_sub():
