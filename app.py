@@ -501,21 +501,17 @@ def webhook():
 
             
             # === MENTION WEBHOOK - STORY + FEED ===
+            # === MENTION - ONLY Thank you , no welcome message ===
             if field == "mentions":
                 val = change.get("value", {}) or {}
-                comment_id = val.get("comment_id")
-                media_id = val.get("media_id")
                 from_id = val.get("from", {}).get("id")
-                print(f"MENTION media_id={media_id} comment_id={comment_id} from={from_id}", flush=True)
+                comment_id = val.get("comment_id")
+                print(f"MENTION from={from_id} comment={comment_id}", flush=True)
                 try:
                     if comment_id:
-                        # Feed mention: they tagged you in a comment/caption
                         reply_to_comment(comment_id, MENTION_MESSAGE)
                     if from_id:
-                        # For BOTH feed and story mentions -> DM them + buttons
-                        send_dm(from_id, MENTION_MESSAGE)
-                        time.sleep(0.5)
-                        send_podcast_menu(from_id)
+                        send_dm(from_id, MENTION_MESSAGE)  # only this
                 except Exception as e:
                     print(f"Mention error: {e}", flush=True)
                 continue
